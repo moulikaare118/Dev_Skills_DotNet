@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^cd /workspaces/Dev_Skills_DotNet/DotNet_DevSkills && python3 - <<'PY'\nfrom pathlib import Path\npath = Path\\('src/pages/AssessmentPage\\.jsx'\\)\ntext = path\\.read_text\\(\\)\nold = 'public override string ToString\\(\\) => \"\\$\\{Currency\\} \\{Amount:N2\\}\";'\nnew = 'public override string ToString\\(\\) => \"\\\\\\\\\\$\\{Currency\\} \\{Amount:N2\\}\";'\ncount = text\\.count\\(old\\)\nif count == 0:\n    raise SystemExit\\('Did not find exact Money ToString line to replace'\\)\ntext = text\\.replace\\(old, new\\)\npath\\.write_text\\(text\\)\nprint\\('Replaced', count, 'Money ToString occurrences'\\)\nPY$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}
