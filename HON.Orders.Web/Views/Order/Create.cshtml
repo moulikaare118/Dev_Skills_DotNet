@@ -1,0 +1,118 @@
+@model HON.Orders.Web.Models.CreateOrderModel
+
+@{
+    ViewData["Title"] = "Create Order";
+}
+
+<h1>Create Order</h1>
+
+@if (TempData["Message"] is string message)
+{
+    <div class="alert alert-success">@message</div>
+}
+
+<form asp-controller="Order" asp-action="Create" method="post">
+    <div class="mb-3">
+        <label asp-for="CustomerId" class="form-label">Customer</label>
+        <select asp-for="CustomerId" asp-items="@(new SelectList(Model.Customers, "Id", "Name"))" class="form-select"></select>
+        <span asp-validation-for="CustomerId" class="text-danger"></span>
+    </div>
+
+    <div id="lineItems" class="mb-4">
+        @for (var index = 0; index < Model.LineItems.Count; index++)
+        {
+            <div class="card mb-3 p-3">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-5">
+                        <label class="form-label">Product</label>
+                        <select asp-for="LineItems[@index].ProductId" class="form-select">
+                            @foreach (var product in Model.Products)
+                            {
+                                <option value="@product.Id" data-price="@product.UnitPrice">@product.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Quantity</label>
+                        <input asp-for="LineItems[@index].Quantity" class="form-control" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Unit Price</label>
+                        <input asp-for="LineItems[@index].UnitPrice" class="form-control" readonly />
+                    </div>
+                    <div class="col-md-1">
+                        <button type="button" class="btn btn-danger remove-line-item">×</button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <button type="button" class="btn btn-outline-primary mb-4" id="addLineItem">Add line item</button>
+    <div class="mb-3">
+        <button type="submit" class="btn btn-primary">Submit Order</button>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        const products = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Products.Select(p => new { p.Id, p.UnitPrice })));
+
+        function refreshPrices() {
+            document.querySelectorAll('#lineItems select').forEach(select => {
+                const selected = products.find(p => p.Id === parseInt(select.value, 10));
+                const row = select.closest('.card');
+                const priceInput = row.querySelector('[name$=".UnitPrice"]');
+                if (selected && priceInput) {
+                    priceInput.value = selected.UnitPrice.toFixed(2);
+                }
+            });
+        }
+
+        document.getElementById('addLineItem').addEventListener('click', () => {
+            const index = document.querySelectorAll('#lineItems .card').length;
+            const template = `
+                <div class="card mb-3 p-3">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-5">
+                            <label class="form-label">Product</label>
+                            <select name="LineItems[${index}].ProductId" class="form-select product-select"></select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Quantity</label>
+                            <input name="LineItems[${index}].Quantity" class="form-control" value="1" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Unit Price</label>
+                            <input name="LineItems[${index}].UnitPrice" class="form-control" readonly />
+                        </div>
+                        <div class="col-md-1">
+                            <button type="button" class="btn btn-danger remove-line-item">×</button>
+                        </div>
+                    </div>
+                </div>`;
+            document.getElementById('lineItems').insertAdjacentHTML('beforeend', template);
+            const select = document.querySelectorAll('#lineItems .product-select').item(index);
+            products.forEach(product => {
+                select.insertAdjacentHTML('beforeend', `<option value="${product.Id}">${product.Id}</option>`);
+            });
+            refreshPrices();
+        });
+
+        document.getElementById('lineItems').addEventListener('click', event => {
+            if (event.target.matches('.remove-line-item')) {
+                event.target.closest('.card').remove();
+                refreshPrices();
+            }
+        });
+
+        document.getElementById('lineItems').addEventListener('change', event => {
+            if (event.target.matches('select')) {
+                refreshPrices();
+            }
+        });
+
+        refreshPrices();
+    </script>
+}

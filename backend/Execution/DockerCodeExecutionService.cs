@@ -8,7 +8,7 @@ namespace backend.Execution
     {
         private readonly ILogger<DockerCodeExecutionService> _logger;
         private readonly string _workspaceRoot;
-        private const int TimeoutMilliseconds = 5000;
+        private const int TimeoutMilliseconds = 15000;
         private const int MemoryLimitMegabytes = 256;
 
         public DockerCodeExecutionService(ILogger<DockerCodeExecutionService> logger)
@@ -93,7 +93,7 @@ namespace backend.Execution
 
         private async Task<ExecutionResult> BuildProjectAsync(string workspaceDirectory)
         {
-            var startInfo = new ProcessStartInfo("dotnet", "build --no-restore")
+            var startInfo = new ProcessStartInfo("dotnet", "build")
             {
                 WorkingDirectory = workspaceDirectory,
                 RedirectStandardOutput = true,
@@ -137,6 +137,20 @@ namespace backend.Execution
 
             if (!Directory.Exists(projectDir))
             {
+                var debugDir = Path.Combine(sourceDir, "bin", "Debug");
+                if (Directory.Exists(debugDir))
+                {
+                    var fallbackDir = Directory.GetDirectories(debugDir, "net*").OrderByDescending(Path.GetFileName).FirstOrDefault();
+                    if (!string.IsNullOrEmpty(fallbackDir))
+                    {
+                        projectDir = fallbackDir;
+                        _logger.LogInformation("Using fallback project directory for execution {ExecutionId}: {ProjectDir}", executionId, projectDir);
+                    }
+                }
+            }
+
+            if (!Directory.Exists(projectDir))
+            {
                 return new ExecutionResult
                 {
                     Success = false,
@@ -166,10 +180,9 @@ namespace backend.Execution
                 "--cpus", "1",
                 "-v", $"{projectDir}:/app:ro",
                 "-w", "/app",
-                "mcr.microsoft.com/dotnet/runtime:8.0",
-                "/bin/bash",
-                "-lc",
-                $"timeout 5s dotnet ./{dllName}"
+                "mcr.microsoft.com/dotnet/runtime:10.0",
+                "dotnet",
+                $"./{dllName}"
             };
             _logger.LogInformation("Running Docker execution {ExecutionId} with projectDir={ProjectDir} dll={DllName} container={ContainerName}", executionId, projectDir, dllName, containerName);
 
@@ -193,11 +206,12 @@ namespace backend.Execution
 
             var outputTask = process.StandardOutput.ReadToEndAsync();
             var errorTask = process.StandardError.ReadToEndAsync();
+            var waitTask = process.WaitForExitAsync();
 
-            var completed = await Task.WhenAny(process.WaitForExitAsync(), Task.Delay(TimeoutMilliseconds));
+            var completed = await Task.WhenAny(waitTask, Task.Delay(TimeoutMilliseconds));
             stopwatch.Stop();
 
-            if (completed != process.WaitForExitAsync())
+            if (completed != waitTask)
             {
                 try
                 {
@@ -215,6 +229,7 @@ namespace backend.Execution
                 };
             }
 
+            await waitTask;
             var output = await outputTask;
             var error = await errorTask;
             var memoryKb = 0;

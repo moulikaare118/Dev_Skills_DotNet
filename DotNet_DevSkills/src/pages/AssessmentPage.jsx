@@ -67,6 +67,12 @@ export default function AssessmentPage({ theme, onToggleTheme }) {
     setShowSubmissionModal(true);
   };
 
+  const handleGetSolution = () => {
+    if (timeExpired) {
+      window.alert('Time is up. Solution access is now available.');
+    }
+  };
+
   const handleSubmissionModalClose = () => {
     setShowSubmissionModal(false);
     navigate('/');
@@ -97,14 +103,24 @@ export default function AssessmentPage({ theme, onToggleTheme }) {
               </div>
             </div>
             <ThemeToggle theme={theme} onToggleTheme={onToggleTheme} />
-            <button
-              type="button"
-              disabled={!uploadedFile || submitted || timeExpired}
-              onClick={handleSubmit}
-              className="inline-flex items-center justify-center rounded-3xl bg-slate-900 px-5 py-4 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:bg-slate-300"
-            >
-              Submit Assessment
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                disabled={!uploadedFile || submitted || timeExpired}
+                onClick={handleSubmit}
+                className="inline-flex items-center justify-center rounded-3xl bg-slate-900 px-5 py-4 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                Submit Assessment
+              </button>
+              <button
+                type="button"
+                disabled={!timeExpired}
+                onClick={handleGetSolution}
+                className="inline-flex items-center justify-center rounded-3xl bg-sky-500 px-5 py-4 text-sm font-semibold text-slate-950 transition disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 hover:bg-sky-400"
+              >
+                Get Solution
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -119,7 +135,7 @@ export default function AssessmentPage({ theme, onToggleTheme }) {
           <section className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Rules</h2>
             <ol className="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
-              {problem.rules.map((rule) => (
+              {(problem.constraints || []).map((rule) => (
                 <li key={rule} className="flex gap-2"><span className="font-semibold">•</span><span>{rule}</span></li>
               ))}
             </ol>

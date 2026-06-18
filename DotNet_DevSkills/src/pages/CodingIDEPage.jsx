@@ -1,405 +1,245 @@
-import { useState } from 'react';
-import { FiPlay, FiCheckCircle, FiRefreshCcw } from 'react-icons/fi';
+import { useEffect, useMemo, useCallback, useState } from 'react';
 import Editor from '@monaco-editor/react';
 import ThemeToggle from '../components/ThemeToggle';
+import FileExplorer from '../components/FileExplorer';
+import AssessmentDetails from '../components/AssessmentDetails';
+import ConsolePanel from '../components/ConsolePanel';
+import KeyboardShortcuts from '../components/KeyboardShortcuts';
 import Timer from '../components/Timer';
+import useIDEStore from '../store/useIDEStore';
+import { runCode, runTests, submitSolution } from '../services/api';
 
-const defaultCode = `using System;
-
-public class Solution
-{
-    public static void Main(string[] args)
-    {
-        Console.WriteLine("Hello World");
-    }
-}
-`;
-
-const problem = {
-  title: 'Two Sum',
-  difficulty: 'Easy',
-  description:
-    'Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.',
-  constraints: [
-    '2 <= nums.length <= 104',
-    '-109 <= nums[i] <= 109',
-    'Each input would have exactly one solution.'
-  ],
-  examples: [
-    {
-      input: 'nums = [2,7,11,15], target = 9',
-      output: '[0, 1]'
-    },
-    {
-      input: 'nums = [3,2,4], target = 6',
-      output: '[1, 2]'
-    }
+const problemMeta = {
+  title: 'HON Orders Assessment',
+  difficulty: 'Medium',
+  timeLimit: '90 minutes',
+  language: 'C#',
+  description: 'Build a mini ASP.NET Core MVC order-management assessment with EF Core, MVC pages, and xUnit tests.',
+  inputFormat: 'Read input from the provided editor and execute the .NET solution.',
+  outputFormat: 'Return console output or test results for the submitted C# code.',
+  examples: 'Input: nums = [2,7,11,15]\nTarget: 9\nOutput: [0, 1]',
+  instructions: [
+    'Use the editor to update files in the solution explorer.',
+    'Run code, execute tests, and submit when ready.',
+    'Autosave is enabled every 30 seconds.',
+    'Unsaved changes appear in the header badge.'
   ]
 };
 
 export default function CodingIDEPage({ theme, onToggleTheme }) {
-  const [activeTab, setActiveTab] = useState('description');
-  const [panelTab, setPanelTab] = useState('output');
-  const [editorCode, setEditorCode] = useState(defaultCode);
-  const [running, setRunning] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [output, setOutput] = useState('Ready to run your code.');
-  const [customInput, setCustomInput] = useState(`nums = [2,7,11,15]\ntarget = 9`);
-  const [testResults, setTestResults] = useState([
-    '✓ Test Case 1 Passed',
-    '✓ Test Case 2 Passed',
-    'Execution Time: 35ms',
-    'Memory: 18MB'
-  ]);
-  const [submissionResult, setSubmissionResult] = useState([
-    'Accepted',
-    '25/25 Test Cases Passed',
-    'Runtime: 42ms',
-    'Memory: 20MB'
-  ]);
+  const activeFileId = useIDEStore((state) => state.activeFileId);
+  const files = useIDEStore((state) => state.files);
+  const activeOutputTab = useIDEStore((state) => state.activeOutputTab);
+  const activeRightTab = useIDEStore((state) => state.activeRightTab);
+  const outputLines = useIDEStore((state) => state.outputLines);
+  const testLines = useIDEStore((state) => state.testLines);
+  const submissionLines = useIDEStore((state) => state.submissionLines);
+  const unsavedChanges = useIDEStore((state) => state.unsavedChanges);
+  const fullscreen = useIDEStore((state) => state.fullscreen);
+  const [timeExpired, setTimeExpired] = useState(false);
+  const setActiveFile = useIDEStore((state) => state.setActiveFile);
+  const updateFileContent = useIDEStore((state) => state.updateFileContent);
+  const setActiveOutputTab = useIDEStore((state) => state.setActiveOutputTab);
+  const setActiveRightTab = useIDEStore((state) => state.setActiveRightTab);
+  const setOutputLines = useIDEStore((state) => state.setOutputLines);
+  const setTestLines = useIDEStore((state) => state.setTestLines);
+  const setSubmissionLines = useIDEStore((state) => state.setSubmissionLines);
+  const saveChanges = useIDEStore((state) => state.saveChanges);
+  const resetEditor = useIDEStore((state) => state.resetEditor);
+  const refreshFiles = useIDEStore((state) => state.refreshFiles);
+  const toggleFullscreen = useIDEStore((state) => state.toggleFullscreen);
 
-  const editorTheme = 'light';
-  const pageThemeClasses = 'bg-slate-100 text-slate-900';
-  const panelClasses = 'border border-slate-200 bg-white text-slate-900';
-  const panelSecondaryClasses = 'rounded-3xl border border-slate-200 bg-slate-50 text-slate-700';
-  const cardHeaderClasses = 'bg-slate-50 border-slate-200 text-slate-700';
+  const activeFile = useMemo(() => files.find((file) => file.id === activeFileId), [files, activeFileId]);
+  const editorTheme = theme === 'dark' ? 'vs-dark' : 'vs-light';
 
-  const handleRun = async () => {
-    setRunning(true);
-    setPanelTab('output');
+  const handleRun = useCallback(async () => {
+    setActiveOutputTab('output');
+    setOutputLines(['Launching code execution...']);
 
     try {
-      const response = await fetch('/api/code/run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          problemId: '00000000-0000-0000-0000-000000000000',
-          code: editorCode,
-          customInput
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        setOutput(`Error: ${errorText}`);
-      } else {
-        const data = await response.json();
-        setOutput(data.output || data.standardOutput || 'No output returned.');
-      }
+      const response = await runCode(activeFile?.content || '');
+      setOutputLines([response.output || 'No output returned.']);
     } catch (error) {
-      setOutput(`Execution failed: ${error}. Make sure the backend is running on http://localhost:5000`);
-    } finally {
-      setRunning(false);
+      setOutputLines([`Error: ${error.message || error}`]);
     }
-  };
+  }, [activeFile?.content, setActiveOutputTab, setOutputLines]);
 
-  const handleTest = async () => {
-    setTesting(true);
-    setPanelTab('tests');
+  const handleTest = useCallback(async () => {
+    setActiveOutputTab('tests');
+    setTestLines(['Running tests...']);
 
     try {
-      const response = await fetch('/api/code/test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          problemId: '00000000-0000-0000-0000-000000000000',
-          code: editorCode
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        setTestResults([`Error: ${errorText}`]);
-      } else {
-        const data = await response.json();
-        const lines = [
-          `${data.passed}/${data.total} Test Cases Passed`
-        ];
-
-        if (data.results?.length) {
-          lines.push(...data.results.map((result) =>
-            `Test ${result.testCaseId.slice(0, 8)}: ${result.passed ? 'Passed' : 'Failed'} (${result.actualOutput} | expected ${result.expectedOutput})`
-          ));
-        }
-
-        setTestResults(lines);
-      }
+      const response = await runTests(activeFile?.content || '');
+      const lines = [`Passed: ${response.passed}`, `Failed: ${response.failed}`, `Total: ${response.passed + response.failed}`];
+      setTestLines(lines.concat(response.results?.map((result) => `${result.name}: ${result.passed ? '✓' : '✗'}`) || []));
     } catch (error) {
-      setTestResults([`Test failed: ${error}. Make sure the backend is running on http://localhost:5000`]);
-    } finally {
-      setTesting(false);
+      setTestLines([`Error: ${error.message || error}`]);
     }
-  };
+  }, [activeFile?.content, setActiveOutputTab, setTestLines]);
 
-  const handleSubmit = async () => {
-    setSubmitting(true);
-    setPanelTab('submission');
+  const handleSubmit = useCallback(async () => {
+    setActiveOutputTab('submission');
+    setSubmissionLines(['Submitting final solution...']);
 
     try {
-      const response = await fetch('/api/code/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          problemId: '00000000-0000-0000-0000-000000000000',
-          userId: '00000000-0000-0000-0000-000000000000',
-          code: editorCode
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        setSubmissionResult([`Error: ${errorText}`]);
-      } else {
-        const data = await response.json();
-        setSubmissionResult([
-          data.status,
-          `${data.passed}/${data.total} Test Cases Passed`,
-          `Runtime: ${data.executionTimeMs}ms`,
-          `Memory: ${data.memoryKb}KB`
-        ]);
-      }
+      const response = await submitSolution(activeFile?.content || '');
+      setSubmissionLines([
+        `Status: ${response.status || 'Submitted'}`,
+        `Passed: ${response.passed || 0}`,
+        `Failed: ${response.failed || 0}`,
+        `Message: ${response.message || 'Solution submitted successfully.'}`
+      ]);
     } catch (error) {
-      setSubmissionResult([`Submission failed: ${error}. Make sure the backend is running on http://localhost:5000`]);
-    } finally {
-      setSubmitting(false);
+      setSubmissionLines([`Error: ${error.message || error}`]);
     }
-  };
+  }, [activeFile?.content, setActiveOutputTab, setSubmissionLines]);
 
-  const handleReset = () => {
-    setEditorCode(defaultCode);
-    setOutput('Hello World');
-    setPanelTab('output');
-  };
+  const handleGetSolution = useCallback(() => {
+    if (!timeExpired) return;
+    setActiveOutputTab('submission');
+    setSubmissionLines(['Time is up. Solution access is now available.']);
+  }, [timeExpired, setActiveOutputTab, setSubmissionLines]);
+
+  const handleAction = useCallback((action) => {
+    if (action === 'hints') {
+      setSubmissionLines(['Hint: focus on MVC controllers, EF Core configuration, and clean validation.']);
+    }
+    if (action === 'reset') {
+      resetEditor();
+      setSubmissionLines(['Editor reset to starter files.']);
+    }
+  }, [resetEditor, setSubmissionLines]);
+
+  useEffect(() => {
+    const saveInterval = window.setInterval(() => {
+      if (unsavedChanges) {
+        saveChanges();
+      }
+    }, 30000);
+
+    return () => window.clearInterval(saveInterval);
+  }, [unsavedChanges, saveChanges]);
+
+  useEffect(() => {
+    const handleShortcut = (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+        event.preventDefault();
+        saveChanges();
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault();
+        handleRun();
+      }
+      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 't') {
+        event.preventDefault();
+        handleTest();
+      }
+    };
+
+    window.addEventListener('keydown', handleShortcut);
+    return () => window.removeEventListener('keydown', handleShortcut);
+  }, [handleRun, handleTest, saveChanges]);
 
   return (
-    <main className={`min-h-screen ${pageThemeClasses}`}>
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <header className={`rounded-3xl ${panelClasses} p-5 shadow-2xl shadow-slate-200/30`}>
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-900">.NET Coding IDE</div>
-            </div>
-            <div className="text-center text-slate-900">
-              <p className="text-sm uppercase tracking-[0.3em] text-sky-500">Problem</p>
-              <h1 className="text-2xl font-semibold text-slate-900">Two Sum</h1>
-            </div>
-            <div className="flex flex-wrap items-center gap-3 justify-end">
-              <div className="rounded-3xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 shadow-inner shadow-slate-200/20">
-                <span className="block text-slate-500">Timer</span>
-                <Timer initialSeconds={12600} active />
-              </div>
-              <button
-                type="button"
-                onClick={handleRun}
-                disabled={running}
-                className="inline-flex items-center gap-2 rounded-3xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <FiPlay className="h-4 w-4" /> Run
-              </button>
-              <button
-                type="button"
-                onClick={handleTest}
-                disabled={testing}
-                className="inline-flex items-center gap-2 rounded-3xl bg-indigo-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Test
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="inline-flex items-center gap-2 rounded-3xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <FiCheckCircle className="h-4 w-4" /> Submit
-              </button>
-              <button
-                type="button"
-                onClick={handleReset}
-                className="inline-flex items-center gap-2 rounded-3xl bg-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-300"
-              >
-                <FiRefreshCcw className="h-4 w-4" /> Reset
-              </button>
-              <ThemeToggle theme={theme} onToggleTheme={onToggleTheme} />
+    <main className="min-h-screen bg-[#F8FAFC] text-slate-900 overflow-x-hidden">
+      <div className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 px-4 py-4 shadow-sm backdrop-blur-md sm:px-6">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-3xl bg-[#84BD00] px-4 py-2 text-sm font-semibold text-slate-950">HON Orders</div>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Assessment IDE</p>
+              <p className="text-xs text-slate-500">.NET / C# Coding Assessment</p>
             </div>
           </div>
-        </header>
 
-        <div className="mt-6 grid gap-6 xl:grid-cols-[35%_65%] items-start">
-          <aside className={`rounded-3xl ${panelClasses} p-5 shadow-lg shadow-slate-200/20`}>
-            <div className={`flex items-center justify-between rounded-3xl border px-4 py-3 ${cardHeaderClasses}`}>
-              <button
-                type="button"
-                onClick={() => setActiveTab('description')}
-                className={`rounded-3xl px-4 py-2 text-sm font-semibold transition ${
-                  activeTab === 'description'
-                    ? 'bg-sky-500 text-slate-950'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                Description
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('tests')}
-                className={`rounded-3xl px-4 py-2 text-sm font-semibold transition ${
-                  activeTab === 'tests'
-                    ? 'bg-sky-500 text-slate-950'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                Test Cases
-              </button>
+          <div className="flex items-center gap-4">
+            <div className="rounded-3xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm">
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Time Remaining</p>
+              <Timer active={!timeExpired} onExpire={() => setTimeExpired(true)} />
             </div>
+            {/* <div className="rounded-3xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm">Candidate: Alex</div> */}
+            <ThemeToggle theme={theme} onToggleTheme={onToggleTheme} />
+          </div>
+        </div>
+      </div>
 
-            <div className={`mt-5 space-y-5 rounded-3xl ${panelSecondaryClasses} p-5 shadow-sm`}>
-              {activeTab === 'description' ? (
-                <div className="space-y-5">
-                  <div>
-                    <h2 className="text-sm uppercase tracking-[0.2em] text-sky-400">Problem Statement</h2>
-                    <p className="mt-3 text-sm leading-7 text-slate-300">{problem.description}</p>
-                  </div>
-
-                  <div>
-                    <h2 className="text-sm uppercase tracking-[0.2em] text-sky-400">Constraints</h2>
-                    <ul className="mt-3 space-y-2 text-sm text-slate-300">
-                      {problem.constraints.map((item) => (
-                        <li key={item} className="flex gap-3">
-                          <span className="text-sky-300">•</span>
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h2 className="text-sm uppercase tracking-[0.2em] text-sky-400">Examples</h2>
-                    <pre className="mt-3 rounded-2xl bg-slate-100 p-4 text-sm leading-6 text-slate-700">nums = [2,7,11,15]
-target = 9</pre>
-                  </div>
+      <div className="mx-auto mt-6 max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
+        <div className="grid min-h-[calc(100vh-160px)] gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
+          <aside className="flex min-w-0 flex-col gap-5">
+            <div className="w-full max-w-[280px]">
+              <FileExplorer
+                files={files}
+                activeFileId={activeFileId}
+                onSelectFile={setActiveFile}
+                onSave={saveChanges}
+                onRefresh={refreshFiles}
+              />
+            </div>
+            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Status</p>
+                  <p className="mt-2 text-lg font-semibold text-slate-900">{unsavedChanges ? 'Unsaved changes' : 'Saved'}</p>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  <p className="text-sm text-slate-400">Run custom input against your code.</p>
-                  <textarea
-                    className="h-56 w-full resize-y rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-900 outline-none transition focus:border-sky-400"
-                    value={customInput}
-                    onChange={(event) => setCustomInput(event.target.value)}
-                  />
-                </div>
-              )}
+                {/* <button onClick={toggleFullscreen} className="rounded-3xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800">{fullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</button> */}
+              </div>
             </div>
           </aside>
 
-          <div className="space-y-6">
-            <div className={`rounded-3xl ${panelClasses} p-4 shadow-lg shadow-slate-200/20`}>
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="grid gap-5">
+            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm uppercase tracking-[0.25em] text-sky-500">Editor Controls</p>
-                  <h2 className="mt-1 text-xl font-semibold text-slate-900">IDE Toolbar</h2>
+                  <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Editor</p>
+                  <h2 className="mt-1 text-xl font-semibold text-slate-900">Coding Workspace</h2>
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handleRun}
-                    disabled={running}
-                    className="inline-flex items-center gap-2 rounded-3xl bg-sky-500 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <FiPlay className="h-4 w-4" /> {running ? 'Running...' : 'Run'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={submitting}
-                    className="inline-flex items-center gap-2 rounded-3xl bg-emerald-500 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <FiCheckCircle className="h-4 w-4" /> {submitting ? 'Submitting...' : 'Submit'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleReset}
-                    className="inline-flex items-center gap-2 rounded-3xl bg-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-300"
-                  >
-                    <FiRefreshCcw className="h-4 w-4" /> Reset
-                  </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button onClick={handleRun} className="inline-flex items-center gap-2 rounded-3xl bg-[#84BD00] px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-emerald-500">Run</button>
+                  <button onClick={handleTest} className="inline-flex items-center gap-2 rounded-3xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800">Test</button>
+                  <button onClick={handleSubmit} className="inline-flex items-center gap-2 rounded-3xl bg-sky-500 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-sky-400">Submit</button>
+                  <button onClick={handleGetSolution} disabled={!timeExpired} className="inline-flex items-center gap-2 rounded-3xl bg-slate-800 px-3 py-2 text-xs font-semibold text-white transition disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 hover:bg-slate-700">Get Solution</button>
+                  <button onClick={resetEditor} className="inline-flex items-center gap-2 rounded-3xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200">Reset</button>
                 </div>
+              </div>
+              <div className="h-[calc(100vh-340px)] overflow-hidden rounded-3xl bg-slate-950">
+                <Editor
+                  height="100%"
+                  defaultLanguage="csharp"
+                  value={activeFile?.content || ''}
+                  theme={editorTheme}
+                  options={{
+                    fontSize: 14,
+                    minimap: { enabled: true },
+                    automaticLayout: true,
+                    folding: true,
+                    bracketPairColorization: { enabled: true },
+                    renderWhitespace: 'boundary',
+                    suggestOnTriggerCharacters: true,
+                    wordWrap: 'on',
+                    tabSize: 4,
+                    fontFamily: 'Fira Code, Menlo, Monaco, Consolas, Liberation Mono, monospace'
+                  }}
+                  onChange={(value) => {
+                    if (value !== undefined && activeFile) {
+                      updateFileContent(activeFile.id, value);
+                    }
+                  }}
+                />
               </div>
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-[65%_35%]">
-              <div className={`rounded-3xl ${panelClasses} p-0 shadow-lg shadow-slate-200/20`}>
-                <div className="h-[500px] overflow-hidden rounded-3xl bg-slate-50">
-                  <Editor
-                    height="100%"
-                    defaultLanguage="csharp"
-                    value={editorCode}
-                    theme={editorTheme}
-                    options={{
-                      fontSize: 14,
-                      minimap: { enabled: false },
-                      lineNumbers: 'on',
-                      scrollBeyondLastLine: false,
-                      automaticLayout: true,
-                      wordWrap: 'on',
-                      fontFamily: 'Fira Code, Menlo, Monaco, Consolas, Liberation Mono, monospace'
-                    }}
-                    onChange={(value) => setEditorCode(value || defaultCode)}
-                  />
-                </div>
+            <div className="grid gap-5 xl:grid-cols-[2fr_1fr]">
+              <ConsolePanel
+                activeTab={activeOutputTab}
+                outputLines={outputLines}
+                testLines={testLines}
+                submissionLines={submissionLines}
+                setActiveTab={setActiveOutputTab}
+              />
+              <div className="grid gap-5">
+                <AssessmentDetails activeTab={activeRightTab} onChangeTab={setActiveRightTab} problemMeta={problemMeta} onAction={handleAction} />
+                {/* <KeyboardShortcuts /> */}
               </div>
-
-              <section className={`rounded-3xl ${panelClasses} p-5 shadow-lg shadow-slate-200/20`}>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm uppercase tracking-[0.25em] text-sky-500">Console / Test Results</p>
-                    <p className="text-slate-600">Mock output, test results, and submission feedback.</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {['output', 'tests', 'submission'].map((tab) => (
-                      <button
-                        key={tab}
-                        type="button"
-                        onClick={() => setPanelTab(tab)}
-                        className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                          panelTab === tab
-                            ? 'bg-sky-500 text-slate-950'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                        }`}
-                      >
-                        {tab === 'output' ? 'Output' : tab === 'tests' ? 'Test Results' : 'Submission Result'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-5 h-[500px] overflow-auto rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-                  {panelTab === 'output' && (
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2 text-sm text-slate-500">
-                        {running ? <span className="inline-flex h-2.5 w-2.5 animate-pulse rounded-full bg-sky-400" /> : null}
-                        <span>{running ? 'Running code…' : 'Program output'}</span>
-                      </div>
-                      <pre className="rounded-2xl bg-slate-100 p-4 text-sm leading-6 text-slate-700">{output}</pre>
-                    </div>
-                  )}
-
-                  {panelTab === 'tests' && (
-                    <div className="space-y-3 text-slate-700">
-                      {testResults.map((line) => (
-                        <p key={line} className={line.startsWith('✓') ? 'text-emerald-500' : 'text-slate-600'}>{line}</p>
-                      ))}
-                    </div>
-                  )}
-
-                  {panelTab === 'submission' && (
-                    <div className="space-y-3 text-slate-700">
-                      {submissionResult.map((line) => (
-                        <p key={line} className={line.includes('Accepted') ? 'text-emerald-400' : 'text-slate-300'}>{line}</p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </section>
             </div>
           </div>
         </div>
