@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
+import { loadAssessmentMeta } from '../services/api';
 
-const taskCards = [
+const fallbackTaskCards = [
   {
     title: 'Git Repository',
     description: 'Select repository-based workflow.',
@@ -21,14 +23,21 @@ const taskCards = [
 
 export default function TaskSelectionPage({ theme, onToggleTheme }) {
   const navigate = useNavigate();
+  const [meta, setMeta] = useState(null);
+
+  useEffect(() => {
+    loadAssessmentMeta().then(setMeta).catch(() => setMeta(null));
+  }, []);
+
+  const taskCards = meta?.taskSelection?.cards?.length ? meta.taskSelection.cards : fallbackTaskCards;
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
       <div className="rounded-3xl bg-white dark:bg-slate-950 p-8 shadow-sm ring-1 ring-slate-200 dark:ring-slate-700">
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold text-slate-900 dark:text-slate-100">You're about to start a programming task</h1>
-            <p className="mt-3 text-slate-600 dark:text-slate-300">Choose the workflow you will use to complete the assessment.</p>
+            <h1 className="text-3xl font-semibold text-slate-900 dark:text-slate-100">{meta?.taskSelection?.title || "You're about to start a programming task"}</h1>
+            <p className="mt-3 text-slate-600 dark:text-slate-300">{meta?.taskSelection?.description || 'Choose the workflow you will use to complete the assessment.'}</p>
           </div>
           <ThemeToggle theme={theme} onToggleTheme={onToggleTheme} />
         </div>

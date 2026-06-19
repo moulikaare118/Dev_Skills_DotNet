@@ -1,7 +1,9 @@
-const API_BASE = '';
+import assessmentFallback from '../../backend/assessment-data.json';
 
-async function jsonFetch(url, payload) {
-  const response = await fetch(url, {
+const API_BASE = '/api';
+
+async function requestJson(path, payload) {
+  const response = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -15,118 +17,66 @@ async function jsonFetch(url, payload) {
   return response.json();
 }
 
-// Mock API - simulates build and test execution
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function analyzeCode(code) {
-  const hasSyntaxErrors = /^[\s]*$/.test(code);
-  const hasAsync = code.includes('async') && code.includes('await');
-  const hasDbContext = code.includes('DbContext') || code.includes('AppDbContext');
-  const hasServiceInjection = code.includes('ICourseService') || code.includes('CourseServices');
-  
-  return {
-    hasSyntaxErrors,
-    hasAsync,
-    hasDbContext,
-    hasServiceInjection
-  };
-}
-
-export async function runCode(code) {
-  await delay(1200);
-  
-  const analysis = analyzeCode(code);
-  
-  if (analysis.hasSyntaxErrors) {
-    return {
-      output: 'Error: No code provided or empty file.',
-      success: false
-    };
+export async function loadWorkspace(mode = 'starter') {
+  const endpoint = mode === 'solution' ? '/workspace/solution' : '/workspace';
+  const response = await fetch(`${API_BASE}${endpoint}`);
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'Failed to load workspace');
   }
 
-  const output = [
-    'Compiling MainExam project...',
-    'Restoring dependencies...',
-    '',
-    'Build Summary:',
-    '  HON.Academy.DAL → bin/Debug/net10.0/HON.Academy.DAL.dll',
-    '  HON.Academy.Web → bin/Debug/net10.0/HON.Academy.Web.dll',
-    '',
-    'Build succeeded. 0 errors, 0 warnings.',
-    'Time Elapsed 00:00:12.35',
-    '',
-    'Startup: Application ready.',
-    'Loading data context...',
-    'Database initialized with seed data.',
-    'API endpoints available at: https://localhost:5001'
-  ];
-
-  return {
-    output: output.join('\n'),
-    success: true
-  };
+  return response.json();
 }
 
-export async function runTests(code) {
-  await delay(1800);
+export async function loadAssessmentMeta() {
+  try {
+    const response = await fetch(`${API_BASE}/assessment/meta`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || 'Failed to load assessment metadata');
+    }
 
-  const analysis = analyzeCode(code);
-  
-  // All tests should pass by default - student will see realistic test results
-  const results = [
-    { name: 'GetTopStudentsAsync_Returns_TopStudentEntry', passed: true },
-    { name: 'SearchCoursesAsync_Filters_ByFeeDurationKeywordAndSpecialization', passed: true },
-    { name: 'SampleTests.Sanity', passed: true },
-    { name: 'CourseServices_Integration_WithMockDb', passed: true },
-    { name: 'CourseController_Dependency_Injection', passed: true },
-    { name: 'EntityFramework_Relationships', passed: true },
-    { name: 'DTO_Serialization', passed: true },
-    { name: 'Database_Concurrency_Control', passed: true }
-  ];
-
-  const passed = results.filter(r => r.passed).length;
-  const failed = results.filter(r => !r.passed).length;
-
-  const output = [
-    'Test run for HON.Academy.XunitTests.dll (.NETCoreApp,Version=v10.0)',
-    'A total of 1 test file matched the specified pattern.',
-    '',
-    'Test Results:',
-    ...results.map(r => `  ${r.passed ? '✓' : '✗'} ${r.name}`),
-    '',
-    `Passed! - Failed: ${failed}, Passed: ${passed}, Skipped: 0, Total: ${passed + failed}`,
-    'Duration: 1.8s'
-  ];
-
-  return {
-    output: output.join('\n'),
-    passed,
-    failed,
-    results,
-    success: failed === 0
-  };
+    return response.json();
+  } catch {
+    return assessmentFallback;
+  }
 }
 
-export async function submitSolution(code) {
-  await delay(2000);
+export async function loadSolutionWorkspace() {
+  return loadWorkspace('solution');
+}
 
-  const analysis = analyzeCode(code);
-  
-  if (analysis.hasSyntaxErrors) {
-    return {
-      status: 'Failed',
-      passed: 0,
-      failed: 1,
-      message: 'Please submit code content.'
-    };
+export async function runCode(files) {
+  return requestJson('/project/run', { files });
+}
+
+export async function runTests(files) {
+  return requestJson('/project/tests', { files });
+}
+
+export async function submitSolution(files) {
+  return requestJson('/project/submit', { files });
+}
+
+export async function buildUploadedZip(file) {
+  const zipBase64 = await fileToBase64(file);
+  return requestJson('/assessment/build', { zipBase64 });
+}
+
+export async function testUploadedZip(file) {
+  const zipBase64 = await fileToBase64(file);
+  return requestJson('/assessment/tests', { zipBase64 });
+}
+
+async function fileToBase64(file) {
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const chunkSize = 0x8000;
+
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
   }
 
-  return {
-    status: 'Submitted',
-    passed: 8,
-    failed: 0,
-    message: 'Solution submitted successfully! All tests passed. Great work on the MainExam e-learning platform implementation.'
-  };
+  return btoa(binary);
 }

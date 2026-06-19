@@ -6,52 +6,20 @@ import ProgressIndicator from '../components/ProgressIndicator';
 import TimeExpiredModal from '../components/TimeExpiredModal';
 import SubmissionRecordedModal from '../components/SubmissionRecordedModal';
 import ThemeToggle from '../components/ThemeToggle';
+import { loadAssessmentMeta } from '../services/api';
 import { useNavigate } from 'react-router-dom';
-
-const problem = {
-  title: 'HON Orders Training Assessment',
-  description:
-    'Build a mini ASP.NET Core MVC order-management application for the HON Orders training program. Focus on MVC controllers, views, model binding, validation, EF Core data access, and xUnit testing. Do not build or consume Web APIs for this assessment.',
-  requirements: [
-    'HON Orders solution with Web, Data, Domain, and Tests projects',
-    'Baseline domain model entities for Customer, Product, Order, OrderItem, Payment, AuditLog, and Money',
-    'Money value object, decimal.FormatMoney() extension, and arithmetic operators',
-    'Top customer revenue LINQ query, async order stream, and dynamic order filter expression',
-    'EF Core fluent configuration, soft delete, shadow properties, and query filters',
-    'Admin Product CRUD and Customer order creation form with validation and navigation'
-  ],
-  constraints: [
-    'Time limit: 90 minutes.',
-    'Do not build or consume Web APIs for this assessment.',
-    'Download the starter code and complete TODO sections locally.',
-    'Upload your final solution as a ZIP file below 30 MB.',
-    'Submission is final once completed or time expires.'
-  ],
-  deliverables: [
-    'HON.Orders solution with HON.Orders.Web, HON.Orders.Data, HON.Orders.Domain, and HON.Orders.Tests projects',
-    'Responsive MVC layout with shared _Layout.cshtml and area-based routing',
-    'EF Core fluent configuration, soft delete, query filters, and concurrency support',
-    'Admin area product CRUD and customer order creation UX with line items',
-    'Money value object and extension methods, LINQ analytics, async streams, and dynamic filter expression support'
-  ],
-  tasks: [
-    'Implement domain entities: Customer, Product, Order, OrderItem, Payment, AuditLog, Money',
-    'Create Money value object and decimal.FormatMoney() extension method',
-    'Write LINQ query for top 5 customers by revenue using join/grouping',
-    'Build IAsyncEnumerable order stream for paging and await foreach consumption',
-    'Compose a dynamic Expression<Func<Order, bool>> filter for optional order query criteria',
-    'Configure EF Core relationships, precision, shadow properties, and soft delete query filters',
-    'Implement Admin area Product CRUD and Customer area order creation form with validation',
-    'Use MVC tag helpers, TempData notifications, PRG, and authorization filter for Admin role'
-  ]
-};
 
 export default function AssessmentPage({ theme, onToggleTheme }) {
   const [uploadedFile, setUploadedFile] = useState(null);
   const [timeExpired, setTimeExpired] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [showSubmissionModal, setShowSubmissionModal] = useState(false);
+  const [assessmentMeta, setAssessmentMeta] = useState(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    loadAssessmentMeta().then(setAssessmentMeta).catch(() => setAssessmentMeta(null));
+  }, []);
 
   useEffect(() => {
     if (timeExpired) {
@@ -146,13 +114,13 @@ export default function AssessmentPage({ theme, onToggleTheme }) {
 
         <section className="space-y-6">
           <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-            <h2 className="text-2xl font-semibold text-slate-900">{problem.title}</h2>
-            <p className="mt-4 text-slate-600">{problem.description}</p>
+            <h2 className="text-2xl font-semibold text-slate-900">{assessmentMeta?.assessment?.title || 'Assessment'}</h2>
+            <p className="mt-4 text-slate-600">{assessmentMeta?.assessment?.description || 'Loading assessment details...'}</p>
             <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
                 <h3 className="font-semibold text-slate-900">Requirements</h3>
                 <ul className="mt-4 space-y-3 text-slate-600">
-                  {problem.requirements.map((item) => (
+                  {(assessmentMeta?.assessment?.requirements || []).map((item) => (
                     <li key={item} className="flex gap-3">
                       <span className="mt-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700">•</span>
                       <span>{item}</span>
@@ -163,7 +131,7 @@ export default function AssessmentPage({ theme, onToggleTheme }) {
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
                 <h3 className="font-semibold text-slate-900">Tasks</h3>
                 <ul className="mt-4 space-y-3 text-slate-600">
-                  {problem.tasks.map((item) => (
+                  {(assessmentMeta?.assessment?.tasks || []).map((item) => (
                     <li key={item} className="flex gap-3">
                       <span className="mt-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700">•</span>
                       <span>{item}</span>

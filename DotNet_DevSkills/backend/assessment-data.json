@@ -1,0 +1,75 @@
+{
+  "landing": {
+    "title": "DevSkiller Coding Assessment",
+    "welcomeTitle": "Welcome to your assessment",
+    "welcomeDescription": "Please review the instructions below carefully before starting. You will need to download the starter code, complete the task locally, and upload your solution.",
+    "timeLimit": "3h 30m",
+    "taskType": "Download / Upload Code",
+    "instructions": [
+      "Time information: 3 hours 30 minutes.",
+      "Initially the base code must be downloaded.",
+      "The base code contains TODO comments.",
+      "Already written code should not be changed.",
+      "After writing code, candidate must upload the file again.",
+      "Uploaded file must be below 30 MB.",
+      "Certain large files must be removed before upload."
+    ]
+  },
+  "taskSelection": {
+    "title": "You're about to start a programming task",
+    "description": "Choose the workflow you will use to complete the assessment.",
+    "cards": [
+      {
+        "title": "Git Repository",
+        "description": "Select repository-based workflow.",
+        "disabled": true
+      },
+      {
+        "title": "Download / Upload Code",
+        "description": "Use starter code locally and upload a ZIP.",
+        "disabled": false
+      },
+      {
+        "title": "Simple In-Browser Editor",
+        "description": "Write code in the browser editor.",
+        "disabled": false
+      }
+    ]
+  },
+  "assessment": {
+    "title": "HON Orders Training Assessment",
+    "description": "Build a mini ASP.NET Core MVC order-management application for the HON Orders training program. Focus on MVC controllers, views, model binding, validation, EF Core data access, and xUnit testing. Do not build or consume Web APIs for this assessment.",
+    "requirements": [
+      "HON Orders solution with Web, Data, Domain, and Tests projects",
+      "Baseline domain model entities for Customer, Product, Order, OrderItem, Payment, AuditLog, and Money",
+      "Money value object, decimal.FormatMoney() extension, and arithmetic operators",
+      "Top customer revenue LINQ query, async order stream, and dynamic order filter expression",
+      "EF Core fluent configuration, soft delete, shadow properties, and query filters",
+      "Admin Product CRUD and Customer order creation form with validation and navigation"
+    ],
+    "constraints": [
+      "Time limit: 90 minutes.",
+      "Do not build or consume Web APIs for this assessment.",
+      "Download the starter code and complete TODO sections locally.",
+      "Upload your final solution as a ZIP file below 30 MB.",
+      "Submission is final once completed or time expires."
+    ],
+    "deliverables": [
+      "HON.Orders solution with HON.Orders.Web, HON.Orders.Data, HON.Orders.Domain, and HON.Orders.Tests projects",
+      "Responsive MVC layout with shared _Layout.cshtml and area-based routing",
+      "EF Core fluent configuration, soft delete, query filters, and concurrency support",
+      "Admin area product CRUD and customer order creation UX with line items",
+      "Money value object and extension methods, LINQ analytics, async streams, and dynamic filter expression support"
+    ],
+    "tasks": [
+      "Implement domain entities: Customer, Product, Order, OrderItem, Payment, AuditLog, Money",
+      "Create Money value object and decimal.FormatMoney() extension method",
+      "Write LINQ query for top 5 customers by revenue using join/grouping",
+      "Build IAsyncEnumerable order stream for paging and await foreach consumption",
+      "Compose a dynamic Expression<Func<Order, bool>> filter for optional order query criteria",
+      "Configure EF Core relationships, precision, shadow properties, and soft delete query filters",
+      "Implement Admin area Product CRUD and Customer area order creation form with validation",
+      "Use MVC tag helpers, TempData notifications, PRG, and authorization filter for Admin role"
+    ]
+  }
+}

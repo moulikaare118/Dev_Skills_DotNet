@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useCallback, useState } from 'react';
+import { useEffect, useMemo, useCallback, useState, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import ThemeToggle from '../components/ThemeToggle';
 import FileExplorer from '../components/FileExplorer';
@@ -37,8 +37,13 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
   const testLines = useIDEStore((state) => state.testLines);
   const submissionLines = useIDEStore((state) => state.submissionLines);
   const unsavedChanges = useIDEStore((state) => state.unsavedChanges);
+  const workspaceLoaded = useIDEStore((state) => state.workspaceLoaded);
+  const workspaceLoading = useIDEStore((state) => state.workspaceLoading);
+  const workspaceError = useIDEStore((state) => state.workspaceError);
   const fullscreen = useIDEStore((state) => state.fullscreen);
   const [timeExpired, setTimeExpired] = useState(false);
+  const [solutionUnlocked, setSolutionUnlocked] = useState(false);
+  const workspaceSyncStarted = useRef(false);
   const setActiveFile = useIDEStore((state) => state.setActiveFile);
   const updateFileContent = useIDEStore((state) => state.updateFileContent);
   const setActiveOutputTab = useIDEStore((state) => state.setActiveOutputTab);
@@ -49,59 +54,99 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
   const saveChanges = useIDEStore((state) => state.saveChanges);
   const resetEditor = useIDEStore((state) => state.resetEditor);
   const refreshFiles = useIDEStore((state) => state.refreshFiles);
+  const loadWorkspace = useIDEStore((state) => state.loadWorkspace);
   const toggleFullscreen = useIDEStore((state) => state.toggleFullscreen);
 
   const activeFile = useMemo(() => files.find((file) => file.id === activeFileId), [files, activeFileId]);
   const editorTheme = theme === 'dark' ? 'vs-dark' : 'vs-light';
+
+  const formatConsoleOutput = useCallback((response, mode) => {
+    const rawOutput = typeof response?.output === 'string' ? response.output.trim() : '';
+    const placeholderOutput = 'No output returned from dotnet.';
+
+    if (rawOutput && rawOutput !== placeholderOutput) {
+      return rawOutput.split('\n');
+    }
+
+    const label = mode === 'test' ? 'Test' : 'Build';
+    const successMessage = response?.success
+      ? `${label} completed successfully.`
+      : `${label} failed.`;
+
+    const summary = [
+      successMessage,
+      typeof response?.exitCode === 'number' ? `Exit code: ${response.exitCode}` : null,
+      'dotnet produced no console output.'
+    ].filter(Boolean);
+
+    return summary;
+  }, []);
+
+  useEffect(() => {
+    if (!workspaceSyncStarted.current) {
+      workspaceSyncStarted.current = true;
+      loadWorkspace();
+    }
+  }, [loadWorkspace]);
 
   const handleRun = useCallback(async () => {
     setActiveOutputTab('output');
     setOutputLines(['Launching code execution...']);
 
     try {
-      const response = await runCode(activeFile?.content || '');
-      const lines = response.output ? response.output.split('\n') : ['No output returned.'];
-      setOutputLines(lines);
+      const response = await runCode(files);
+      setOutputLines(formatConsoleOutput(response, 'build'));
     } catch (error) {
       setOutputLines([`Error: ${error.message || error}`]);
     }
-  }, [activeFile?.content, setActiveOutputTab, setOutputLines]);
+  }, [files, formatConsoleOutput, setActiveOutputTab, setOutputLines]);
 
   const handleTest = useCallback(async () => {
     setActiveOutputTab('tests');
     setTestLines(['Running tests...']);
 
     try {
-      const response = await runTests(activeFile?.content || '');
-      const lines = response.output ? response.output.split('\n') : [`Error: ${response.message || 'Unable to run tests'}`];
-      setTestLines(lines);
+      const response = await runTests(files);
+      setTestLines(formatConsoleOutput(response, 'test'));
     } catch (error) {
       setTestLines([`Error: ${error.message || error}`]);
     }
-  }, [activeFile?.content, setActiveOutputTab, setTestLines]);
+  }, [files, formatConsoleOutput, setActiveOutputTab, setTestLines]);
 
   const handleSubmit = useCallback(async () => {
     setActiveOutputTab('submission');
     setSubmissionLines(['Submitting final solution...']);
 
     try {
-      const response = await submitSolution(activeFile?.content || '');
+      const response = await submitSolution(files);
       setSubmissionLines([
         `Status: ${response.status || 'Submitted'}`,
         `Passed: ${response.passed || 0}`,
         `Failed: ${response.failed || 0}`,
         `Message: ${response.message || 'Solution submitted successfully.'}`
       ]);
+
+      if (response.success) {
+        setSolutionUnlocked(true);
+      }
     } catch (error) {
       setSubmissionLines([`Error: ${error.message || error}`]);
     }
-  }, [activeFile?.content, setActiveOutputTab, setSubmissionLines]);
+  }, [files, setActiveOutputTab, setSubmissionLines]);
 
-  const handleGetSolution = useCallback(() => {
-    if (!timeExpired) return;
+  const handleGetSolution = useCallback(async () => {
+    if (!timeExpired && !solutionUnlocked) return;
+
     setActiveOutputTab('submission');
-    setSubmissionLines(['Time is up. Solution access is now available.']);
-  }, [timeExpired, setActiveOutputTab, setSubmissionLines]);
+    setSubmissionLines(['Loading solution workspace...']);
+
+    try {
+      await loadWorkspace('solution');
+      setSubmissionLines(['Solution workspace loaded successfully.']);
+    } catch (error) {
+      setSubmissionLines([`Error: ${error.message || 'Unable to load solution workspace'}`]);
+    }
+  }, [loadWorkspace, setActiveOutputTab, setSubmissionLines, solutionUnlocked, timeExpired]);
 
   const handleAction = useCallback((action) => {
     if (action === 'hints') {
@@ -182,7 +227,8 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Status</p>
-                  <p className="mt-2 text-lg font-semibold text-slate-900">{unsavedChanges ? 'Unsaved changes' : 'Saved'}</p>
+                  <p className="mt-2 text-lg font-semibold text-slate-900">{workspaceLoading ? 'Loading workspace...' : unsavedChanges ? 'Unsaved changes' : workspaceLoaded ? 'Saved' : 'Workspace unavailable'}</p>
+                  {workspaceError ? <p className="mt-2 text-sm text-rose-600">{workspaceError}</p> : null}
                 </div>
                 {/* <button onClick={toggleFullscreen} className="rounded-3xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800">{fullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</button> */}
               </div>
@@ -200,34 +246,38 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
                   <button onClick={handleRun} className="inline-flex items-center gap-2 rounded-3xl bg-[#84BD00] px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-emerald-500">Run</button>
                   <button onClick={handleTest} className="inline-flex items-center gap-2 rounded-3xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800">Test</button>
                   <button onClick={handleSubmit} className="inline-flex items-center gap-2 rounded-3xl bg-sky-500 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-sky-400">Submit</button>
-                  <button onClick={handleGetSolution} disabled={!timeExpired} className="inline-flex items-center gap-2 rounded-3xl bg-slate-800 px-3 py-2 text-xs font-semibold text-white transition disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 hover:bg-slate-700">Get Solution</button>
+                  <button onClick={handleGetSolution} disabled={!timeExpired && !solutionUnlocked} className="inline-flex items-center gap-2 rounded-3xl bg-slate-800 px-3 py-2 text-xs font-semibold text-white transition disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 hover:bg-slate-700">Get Solution</button>
                   <button onClick={resetEditor} className="inline-flex items-center gap-2 rounded-3xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200">Reset</button>
                 </div>
               </div>
               <div className="h-[calc(100vh-340px)] overflow-hidden rounded-3xl bg-slate-950">
-                <Editor
-                  height="100%"
-                  defaultLanguage="csharp"
-                  value={activeFile?.content || ''}
-                  theme={editorTheme}
-                  options={{
-                    fontSize: 14,
-                    minimap: { enabled: true },
-                    automaticLayout: true,
-                    folding: true,
-                    bracketPairColorization: { enabled: true },
-                    renderWhitespace: 'boundary',
-                    suggestOnTriggerCharacters: true,
-                    wordWrap: 'on',
-                    tabSize: 4,
-                    fontFamily: 'Fira Code, Menlo, Monaco, Consolas, Liberation Mono, monospace'
-                  }}
-                  onChange={(value) => {
-                    if (value !== undefined && activeFile) {
-                      updateFileContent(activeFile.id, value);
-                    }
-                  }}
-                />
+                {workspaceLoading ? (
+                  <div className="flex h-full items-center justify-center text-sm text-slate-300">Loading workspace from backend...</div>
+                ) : (
+                  <Editor
+                    height="100%"
+                    defaultLanguage="csharp"
+                    value={activeFile?.content || ''}
+                    theme={editorTheme}
+                    options={{
+                      fontSize: 14,
+                      minimap: { enabled: true },
+                      automaticLayout: true,
+                      folding: true,
+                      bracketPairColorization: { enabled: true },
+                      renderWhitespace: 'boundary',
+                      suggestOnTriggerCharacters: true,
+                      wordWrap: 'on',
+                      tabSize: 4,
+                      fontFamily: 'Fira Code, Menlo, Monaco, Consolas, Liberation Mono, monospace'
+                    }}
+                    onChange={(value) => {
+                      if (value !== undefined && activeFile) {
+                        updateFileContent(activeFile.id, value);
+                      }
+                    }}
+                  />
+                )}
               </div>
             </div>
 

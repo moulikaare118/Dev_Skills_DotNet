@@ -1,20 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
-
-const instructions = [
-  'Time information: 3 hours 30 minutes.',
-  'Initially the base code must be downloaded.',
-  'The base code contains TODO comments.',
-  'Already written code should not be changed.',
-  'After writing code, candidate must upload the file again.',
-  'Uploaded file must be below 30 MB.',
-  'Certain large files must be removed before upload.'
-];
+import { loadAssessmentMeta } from '../services/api';
 
 export default function AssessmentLandingPage({ theme, onToggleTheme }) {
   const [accepted, setAccepted] = useState(false);
+  const [meta, setMeta] = useState(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    loadAssessmentMeta().then(setMeta).catch(() => setMeta(null));
+  }, []);
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -26,8 +22,8 @@ export default function AssessmentLandingPage({ theme, onToggleTheme }) {
       <section className="grid gap-10 lg:grid-cols-[1.6fr_1fr]">
         <div className="space-y-6 rounded-3xl bg-white dark:bg-slate-900 p-8 shadow-sm ring-1 ring-slate-200 dark:ring-slate-700">
           <div className="space-y-3">
-            <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Welcome to your assessment</h2>
-            <p className="text-slate-600 dark:text-slate-300">Please review the instructions below carefully before starting. You will need to download the starter code, complete the task locally, and upload your solution.</p>
+            <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{meta?.landing?.welcomeTitle || 'Welcome to your assessment'}</h2>
+            <p className="text-slate-600 dark:text-slate-300">{meta?.landing?.welcomeDescription || 'Loading assessment details...'}</p>
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-950 p-6">
@@ -35,11 +31,11 @@ export default function AssessmentLandingPage({ theme, onToggleTheme }) {
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
                 <p className="text-sm text-slate-500">Time Limit</p>
-                <p className="mt-2 text-2xl font-semibold text-slate-900">3h 30m</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">{meta?.landing?.timeLimit || '3h 30m'}</p>
               </div>
               <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
                 <p className="text-sm text-slate-500">Task type</p>
-                <p className="mt-2 text-2xl font-semibold text-slate-900">Download / Upload Code</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">{meta?.landing?.taskType || 'Download / Upload Code'}</p>
               </div>
             </div>
           </div>
@@ -47,7 +43,7 @@ export default function AssessmentLandingPage({ theme, onToggleTheme }) {
           <div className="rounded-3xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-950 p-6">
             <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Assessment instructions</h3>
             <ul className="mt-4 space-y-3 text-slate-700 dark:text-slate-300">
-              {instructions.map((item) => (
+              {(meta?.landing?.instructions || []).map((item) => (
                 <li key={item} className="flex gap-3">
                   <span className="mt-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700">•</span>
                   <span>{item}</span>

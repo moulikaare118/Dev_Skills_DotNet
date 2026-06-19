@@ -1,36 +1,49 @@
 import { useEffect, useState } from 'react';
+import { buildUploadedZip, testUploadedZip } from '../services/api';
 
 export default function BuildAndTestPanel({ uploadedFile, disabled }) {
   const [buildResult, setBuildResult] = useState(null);
   const [testResults, setTestResults] = useState(null);
   const [running, setRunning] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!uploadedFile) {
       setBuildResult(null);
       setTestResults(null);
+      setError('');
     }
   }, [uploadedFile]);
 
-  const simulateBuild = () => {
+  const runBuild = async () => {
     if (!uploadedFile) return;
     setRunning(true);
+    setError('');
     setBuildResult(null);
     setTestResults(null);
-    window.setTimeout(() => {
-      setBuildResult({ success: true, message: 'Build completed successfully.' });
+    try {
+      const result = await buildUploadedZip(uploadedFile);
+      setBuildResult(result);
+    } catch (buildError) {
+      setError(buildError?.message || 'Build failed.');
+    } finally {
       setRunning(false);
-    }, 800);
+    }
   };
 
-  const simulateTests = () => {
+  const runTests = async () => {
     if (!uploadedFile) return;
     setRunning(true);
+    setError('');
     setTestResults(null);
-    window.setTimeout(() => {
-      setTestResults({ passed: 3, failed: 1, details: [{ name: 'Task 1', status: 'passed' }, { name: 'Task 2', status: 'passed' }, { name: 'Task 3', status: 'passed' }, { name: 'Task 4', status: 'failed' }] });
+    try {
+      const result = await testUploadedZip(uploadedFile);
+      setTestResults(result);
+    } catch (testError) {
+      setError(testError?.message || 'Test run failed.');
+    } finally {
       setRunning(false);
-    }, 1200);
+    }
   };
 
   return (
@@ -44,7 +57,7 @@ export default function BuildAndTestPanel({ uploadedFile, disabled }) {
           <button
             type="button"
             disabled={disabled || !uploadedFile || running}
-            onClick={simulateBuild}
+            onClick={runBuild}
             className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:bg-slate-300"
           >
             Build
@@ -52,7 +65,7 @@ export default function BuildAndTestPanel({ uploadedFile, disabled }) {
           <button
             type="button"
             disabled={disabled || !uploadedFile || running}
-            onClick={simulateTests}
+            onClick={runTests}
             className="inline-flex items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:bg-slate-300"
           >
             Run Test Cases
@@ -61,9 +74,9 @@ export default function BuildAndTestPanel({ uploadedFile, disabled }) {
       </div>
 
       {buildResult ? (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-slate-800">
-          <p className="font-semibold">Build Status: Passed</p>
-          <p>{buildResult.message}</p>
+        <div className={`rounded-2xl border p-4 text-slate-800 ${buildResult.success ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}>
+          <p className="font-semibold">Build Status: {buildResult.success ? 'Passed' : 'Failed'}</p>
+          <pre className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{buildResult.output}</pre>
         </div>
       ) : null}
 
@@ -74,25 +87,16 @@ export default function BuildAndTestPanel({ uploadedFile, disabled }) {
               <p className="text-sm font-semibold text-slate-700">Test Case Results</p>
               <p className="text-slate-500">Latest execution results for uploaded file.</p>
             </div>
-            <div className="inline-flex items-center gap-3 rounded-2xl bg-slate-100 px-4 py-2 text-sm text-slate-700">
-              <span className="font-semibold text-emerald-700">Passed: {testResults.passed}</span>
-              <span className="font-semibold text-rose-600">Failed: {testResults.failed}</span>
+            <div className={`inline-flex items-center gap-3 rounded-2xl px-4 py-2 text-sm ${testResults.success ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+              <span className="font-semibold">{testResults.success ? 'Tests passed' : 'Tests failed'}</span>
             </div>
           </div>
-          <div className="mt-4 space-y-3">
-            {testResults.details.map((item) => (
-              <div key={item.name} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <span className="text-sm text-slate-700">{item.name}</span>
-                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${item.status === 'passed' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                  {item.status === 'passed' ? 'Passed' : 'Failed'}
-                </span>
-              </div>
-            ))}
-          </div>
+          <pre className="mt-4 whitespace-pre-wrap rounded-2xl bg-slate-950 p-4 text-sm text-slate-100">{testResults.output}</pre>
         </div>
       ) : null}
 
-      {running ? <p className="mt-4 text-sm text-slate-600">Running simulation...</p> : null}
+      {error ? <p className="mt-4 text-sm font-medium text-rose-600">{error}</p> : null}
+      {running ? <p className="mt-4 text-sm text-slate-600">Running backend evaluation...</p> : null}
     </div>
   );
 }
