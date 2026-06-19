@@ -3,489 +3,285 @@ import create from 'zustand';
 const initialFiles = [
   {
     id: 'solution',
-    name: 'HON.Orders.sln',
-    path: 'HON.Orders.sln',
+    name: 'HON.Academy.sln',
+    path: 'HON.Academy.sln',
     readOnly: true,
-    content: `Microsoft Visual Studio Solution File, Format Version 12.00`
+    content: `Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35527.113
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HON.Academy.DAL", "HON.Academy.DAL\\HON.Academy.DAL.csproj", "{B024A0F5-86AD-4DAD-BCED-64A33207C3A9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HON.Academy.Web", "HON.Academy.Web\\HON.Academy.Web.csproj", "{1B8582A2-62F8-47A2-BC49-CF4E33C82C32}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HON.Academy.XunitTests", "HON.Academy.XunitTests\\HON.Academy.XunitTests.csproj", "{3D17E952-17A3-4173-853E-690679205CD4}"
+EndProject`
   },
   {
-    id: 'domain-customer',
-    name: 'Customer.cs',
-    path: 'HON.Orders.Domain/Entities/Customer.cs',
+    id: 'model-student',
+    name: 'Student.cs',
+    path: 'HON.Academy.DAL/Model/Student.cs',
     readOnly: false,
-    content: `namespace HON.Orders.Domain.Entities;
-
-public class Customer
+    content: `namespace HON.Academy.DAL.Model
 {
-    public int Id { get; set; }
-    public string Name { get; set; } = null!;
-    public string Email { get; set; } = null!;
+    public class Student
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public DateTime EnrollmentDate { get; set; }
 
-    public List<Order> Orders { get; set; } = new();
+        public ICollection<Enrollment> Enrollments { get; set; } = new List<Enrollment>();
+    }
 }`
   },
   {
-    id: 'domain-product',
-    name: 'Product.cs',
-    path: 'HON.Orders.Domain/Entities/Product.cs',
+    id: 'model-course',
+    name: 'Course.cs',
+    path: 'HON.Academy.DAL/Model/Course.cs',
     readOnly: false,
-    content: `namespace HON.Orders.Domain.Entities;
+    content: `namespace HON.Academy.DAL.Model;
 
-public class Product : ISoftDelete
+public class Course
 {
     public int Id { get; set; }
-    public string Name { get; set; } = null!;
-    public string Sku { get; set; } = null!;
-    public decimal UnitPrice { get; set; }
-    public string Category { get; set; } = null!;
-    public int StockQuantity { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Code { get; set; } = string.Empty;
+    public decimal Fee { get; set; }
+    public int DurationWeeks { get; set; }
     public byte[]? RowVersion { get; set; }
-    public bool IsDeleted { get; set; }
 
-    public List<OrderItem> OrderItems { get; set; } = new();
+    public ICollection<Enrollment> Enrollments { get; set; } = new List<Enrollment>();
+    public ICollection<Assignment> Assignments { get; set; } = new List<Assignment>();
 }`
   },
   {
-    id: 'domain-order',
-    name: 'Order.cs',
-    path: 'HON.Orders.Domain/Entities/Order.cs',
+    id: 'model-assignment',
+    name: 'Assignment.cs',
+    path: 'HON.Academy.DAL/Model/Assignment.cs',
     readOnly: false,
-    content: `namespace HON.Orders.Domain.Entities;
+    content: `namespace HON.Academy.DAL.Model;
 
-public class Order : ISoftDelete
+public class Assignment
 {
     public int Id { get; set; }
-    public string OrderNumber { get; set; } = null!;
-    public int CustomerId { get; set; }
-    public Customer? Customer { get; set; }
-    public DateTime OrderDate { get; set; }
-    public string Status { get; set; } = "New";
-    public decimal Total { get; set; }
-    public byte[]? RowVersion { get; set; }
-    public bool IsDeleted { get; set; }
+    public int CourseId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public int MaxScore { get; set; }
 
-    public List<OrderItem> OrderItems { get; set; } = new();
-    public Payment? Payment { get; set; }
+    public Course? Course { get; set; }
+    public ICollection<Result> Results { get; set; } = new List<Result>();
 }`
   },
   {
-    id: 'domain-orderitem',
-    name: 'OrderItem.cs',
-    path: 'HON.Orders.Domain/Entities/OrderItem.cs',
+    id: 'model-result',
+    name: 'Result.cs',
+    path: 'HON.Academy.DAL/Model/Result.cs',
     readOnly: false,
-    content: `namespace HON.Orders.Domain.Entities;
+    content: `namespace HON.Academy.DAL.Model;
 
-public class OrderItem
+public class Result
 {
     public int Id { get; set; }
-    public int OrderId { get; set; }
-    public Order? Order { get; set; }
-    public int ProductId { get; set; }
-    public Product? Product { get; set; }
-    public int Quantity { get; set; }
-    public decimal UnitPrice { get; set; }
-    public decimal LineTotal { get; set; }
+    public int AssignmentId { get; set; }
+    public int StudentId { get; set; }
+    public int Score { get; set; }
+
+    public Assignment? Assignment { get; set; }
+    public Student? Student { get; set; }
 }`
   },
   {
-    id: 'domain-payment',
-    name: 'Payment.cs',
-    path: 'HON.Orders.Domain/Entities/Payment.cs',
+    id: 'dto-studentperformance',
+    name: 'StudentPerformanceDTO.cs',
+    path: 'HON.Academy.DAL/DataTransferObject/StudentPerformanceDTO.cs',
     readOnly: false,
-    content: `namespace HON.Orders.Domain.Entities;
-
-public class Payment
+    content: `namespace HON.Academy.DAL.DataTransferObject
 {
-    public int Id { get; set; }
-    public int OrderId { get; set; }
-    public Order? Order { get; set; }
-    public decimal Amount { get; set; }
-    public string Method { get; set; } = null!;
-    public DateTime PaidAt { get; set; }
-}`
-  },
-  {
-    id: 'domain-auditlog',
-    name: 'AuditLog.cs',
-    path: 'HON.Orders.Domain/Entities/AuditLog.cs',
-    readOnly: false,
-    content: `namespace HON.Orders.Domain.Entities;
-
-public class AuditLog
-{
-    public int Id { get; set; }
-    public string EntityName { get; set; } = null!;
-    public string EntityId { get; set; } = null!;
-    public string Action { get; set; } = null!;
-    public string Username { get; set; } = null!;
-    public DateTime OccurredAt { get; set; }
-    public string Details { get; set; } = null!;
-}`
-  },
-  {
-    id: 'domain-isoftdelete',
-    name: 'ISoftDelete.cs',
-    path: 'HON.Orders.Domain/Entities/ISoftDelete.cs',
-    readOnly: false,
-    content: `namespace HON.Orders.Domain.Entities;
-
-public interface ISoftDelete
-{
-    bool IsDeleted { get; set; }
-}`
-  },
-  {
-    id: 'domain-money',
-    name: 'Money.cs',
-    path: 'HON.Orders.Domain/ValueObjects/Money.cs',
-    readOnly: false,
-    content: `namespace HON.Orders.Domain.ValueObjects;
-
-public sealed class Money : IEquatable<Money>
-{
-    public decimal Amount { get; }
-    public string Currency { get; }
-
-    public Money(decimal amount, string currency = "USD")
+    public class StudentPerformanceDTO
     {
-        Amount = amount;
-        Currency = currency;
-    }
-
-    public override string ToString() => Format();
-
-    public string Format() => string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:C2}", Amount);
-
-    public static Money operator +(Money left, Money right)
-    {
-        EnsureSameCurrency(left, right);
-        return new Money(left.Amount + right.Amount, left.Currency);
-    }
-
-    public static Money operator -(Money left, Money right)
-    {
-        EnsureSameCurrency(left, right);
-        return new Money(left.Amount - right.Amount, left.Currency);
-    }
-
-    public static Money operator *(Money money, decimal multiplier) => new Money(money.Amount * multiplier, money.Currency);
-    public static Money operator *(decimal multiplier, Money money) => money * multiplier;
-    public static Money operator /(Money money, decimal divisor) => new Money(money.Amount / divisor, money.Currency);
-
-    public static bool operator ==(Money? left, Money? right) => Equals(left, right);
-    public static bool operator !=(Money? left, Money? right) => !Equals(left, right);
-
-    public override bool Equals(object? obj) => Equals(obj as Money);
-
-    public bool Equals(Money? other) => other is not null && Amount == other.Amount && Currency == other.Currency;
-
-    public override int GetHashCode() => HashCode.Combine(Amount, Currency);
-
-    private static void EnsureSameCurrency(Money left, Money right)
-    {
-        if (!string.Equals(left.Currency, right.Currency, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("Cannot operate on Money values with different currencies.");
-        }
+        public string StudentName { get; set; } = string.Empty;
+        public string CourseTitle { get; set; } = string.Empty;
+        public double AverageScore { get; set; }
     }
 }`
   },
   {
-    id: 'domain-decimal-extension',
-    name: 'DecimalMoneyExtensions.cs',
-    path: 'HON.Orders.Domain/Extensions/DecimalMoneyExtensions.cs',
+    id: 'dto-course',
+    name: 'CourseDTO.cs',
+    path: 'HON.Academy.DAL/DataTransferObject/CourseDTO.cs',
     readOnly: false,
-    content: `namespace HON.Orders.Domain.Extensions;
+    content: `using HON.Academy.DAL.Model;
 
-using HON.Orders.Domain.ValueObjects;
-
-// task1.1 - Decimal extension to convert decimals to Money objects
-public static class DecimalMoneyExtensions
+namespace HON.Academy.DAL.DataTransferObject
 {
-    public static Money FormatMoney(this decimal value, string currency = "USD") => new Money(value, currency);
-}`
-  },
-  {
-    id: 'domain-orderfilterbuilder',
-    name: 'OrderFilterBuilder.cs',
-    path: 'HON.Orders.Domain/Filters/OrderFilterBuilder.cs',
-    readOnly: false,
-    content: `namespace HON.Orders.Domain.Filters;
-
-using System.Linq.Expressions;
-using HON.Orders.Domain.Entities;
-
-// task1.4 - Build dynamic order predicates for optional criteria
-public static class OrderFilterBuilder
-{
-    public static Expression<Func<Order, bool>> Build(
-        string? status,
-        DateTime? from,
-        DateTime? to,
-        decimal? minTotal,
-        string? customerEmail)
+    public class CourseDTO
     {
-        Expression<Func<Order, bool>> filter = x => true;
+        public decimal? MinFee { get; set; }
+        public decimal? MaxFee { get; set; }
+        public int? Duration { get; set; }
+        public string Specialization { get; set; } = string.Empty;
+        public string TitleKeyword { get; set; } = string.Empty;
 
-        if (!string.IsNullOrWhiteSpace(status))
-        {
-            filter = filter.And(x => x.Status == status);
-        }
-
-        if (from is DateTime fromDate)
-        {
-            filter = filter.And(x => x.OrderDate >= fromDate);
-        }
-
-        if (to is DateTime toDate)
-        {
-            filter = filter.And(x => x.OrderDate <= toDate);
-        }
-
-        if (minTotal.HasValue)
-        {
-            filter = filter.And(x => x.Total >= minTotal.Value);
-        }
-
-        if (!string.IsNullOrWhiteSpace(customerEmail))
-        {
-            filter = filter.And(x => x.Customer != null && x.Customer.Email == customerEmail);
-        }
-
-        return filter;
-    }
-
-    private static Expression<Func<T, bool>> And<T>(this Expression<Func<T, bool>> left, Expression<Func<T, bool>> right)
-    {
-        var param = Expression.Parameter(typeof(T));
-        var leftBody = Expression.Invoke(left, param);
-        var rightBody = Expression.Invoke(right, param);
-        return Expression.Lambda<Func<T, bool>>(Expression.AndAlso(leftBody, rightBody), param);
+        public List<Course> Results { get; set; } = new List<Course>();
     }
 }`
   },
   {
-    id: 'data-context',
-    name: 'HonOrdersDbContext.cs',
-    path: 'HON.Orders.Data/HonOrdersDbContext.cs',
+    id: 'data-appdbcontext',
+    name: 'AppDbContext.cs',
+    path: 'HON.Academy.DAL/Data/AppDbContext.cs',
     readOnly: false,
-    content: `using HON.Orders.Domain.Entities;
+    content: `using HON.Academy.DAL.Model;
 using Microsoft.EntityFrameworkCore;
 
-namespace HON.Orders.Data;
+namespace HON.Academy.DAL.Data;
 
-// task2.1 / task2.2 - Configure EF Core model, relationships, precision, concurrency, shadow props, and soft delete filters
-public class HonOrdersDbContext : DbContext
+public class AppDbContext : DbContext
 {
-    public HonOrdersDbContext(DbContextOptions<HonOrdersDbContext> options)
-        : base(options)
-    {
-    }
+    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+    public DbSet<Student> Students => Set<Student>();
+    public DbSet<Course> Courses => Set<Course>();
+    public DbSet<Instructor> Instructors => Set<Instructor>();
+    public DbSet<Enrollment> Enrollments => Set<Enrollment>();
+    public DbSet<Assignment> Assignments => Set<Assignment>();
+    public DbSet<Result> Results => Set<Result>();
 
-    public DbSet<Customer> Customers => Set<Customer>();
-    public DbSet<Product> Products => Set<Product>();
-    public DbSet<Order> Orders => Set<Order>();
-    public DbSet<OrderItem> OrderItems => Set<OrderItem>();
-    public DbSet<Payment> Payments => Set<Payment>();
-    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        if (!optionsBuilder.IsConfigured)
+        {
+            optionsBuilder.UseSqlite("Data Source=HONAcademyDB.db");
+        }
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        base.OnModelCreating(modelBuilder);
-
-        modelBuilder.Entity<Customer>(builder =>
-        {
-            builder.HasKey(x => x.Id);
-            builder.Property(x => x.Name).IsRequired().HasMaxLength(200);
-            builder.Property(x => x.Email).IsRequired().HasMaxLength(200);
-            builder.HasMany(x => x.Orders).WithOne(x => x.Customer).HasForeignKey(x => x.CustomerId);
-        });
-
-        modelBuilder.Entity<Product>(builder =>
-        {
-            builder.HasKey(x => x.Id);
-            builder.Property(x => x.Name).IsRequired().HasMaxLength(200);
-            builder.Property(x => x.Sku).IsRequired().HasMaxLength(50);
-            builder.Property(x => x.UnitPrice).HasPrecision(18, 2);
-            builder.Property(x => x.Category).HasMaxLength(100);
-            builder.Property(x => x.RowVersion).IsRowVersion();
-            builder.Property<bool>("IsDeleted").HasDefaultValue(false);
-            builder.Property<string>("CreatedBy").HasMaxLength(100);
-            builder.Property<DateTime>("LastModified");
-            builder.HasQueryFilter(x => !x.IsDeleted);
-        });
-
-        modelBuilder.Entity<Order>(builder =>
-        {
-            builder.HasKey(x => x.Id);
-            builder.Property(x => x.OrderNumber).IsRequired().HasMaxLength(50);
-            builder.Property(x => x.Total).HasPrecision(18, 2);
-            builder.Property(x => x.RowVersion).IsRowVersion();
-            builder.Property<bool>("IsDeleted").HasDefaultValue(false);
-            builder.Property<string>("CreatedBy").HasMaxLength(100);
-            builder.Property<DateTime>("LastModified");
-            builder.HasQueryFilter(x => !x.IsDeleted);
-            builder.HasMany(x => x.OrderItems).WithOne(x => x.Order).HasForeignKey(x => x.OrderId);
-            builder.HasOne(x => x.Payment).WithOne(x => x.Order!).HasForeignKey<Payment>(x => x.OrderId);
-        });
-
-        modelBuilder.Entity<OrderItem>(builder =>
-        {
-            builder.HasKey(x => x.Id);
-            builder.Property(x => x.UnitPrice).HasPrecision(18, 2);
-            builder.Property(x => x.LineTotal).HasPrecision(18, 2);
-            builder.HasOne(x => x.Product).WithMany(x => x.OrderItems).HasForeignKey(x => x.ProductId);
-        });
-
-        modelBuilder.Entity<Payment>(builder =>
-        {
-            builder.HasKey(x => x.Id);
-            builder.Property(x => x.Amount).HasPrecision(18, 2);
-            builder.Property(x => x.Method).IsRequired().HasMaxLength(100);
-        });
-
-        modelBuilder.Entity<AuditLog>(builder =>
-        {
-            builder.HasKey(x => x.Id);
-            builder.Property(x => x.EntityName).IsRequired().HasMaxLength(100);
-            builder.Property(x => x.EntityId).IsRequired().HasMaxLength(100);
-            builder.Property(x => x.Action).IsRequired().HasMaxLength(100);
-            builder.Property(x => x.Username).IsRequired().HasMaxLength(100);
-            builder.Property(x => x.OccurredAt).IsRequired();
-            builder.Property(x => x.Details).IsRequired();
-        });
+        // TODO: Task 2.1 - Configure EF Core model relationships and constraints
+        // - Add unique index on Course.Code
+        // - Add check constraint on Enrollment.CompletionPercent (0-100)
+        // - Configure relationships: Enrollment->Student, Enrollment->Course, Enrollment->Instructor
+        // - Configure relationships: Assignment->Course, Result->Assignment
     }
 }`
   },
   {
-    id: 'data-extensions',
-    name: 'DbContextExtensions.cs',
-    path: 'HON.Orders.Data/Extensions/DbContextExtensions.cs',
+    id: 'service-icourseservice',
+    name: 'ICourseService.cs',
+    path: 'HON.Academy.DAL/Services/ICourseService.cs',
     readOnly: false,
-    content: `using HON.Orders.Domain.Entities;
-using Microsoft.EntityFrameworkCore;
+    content: `using HON.Academy.DAL.DataTransferObject;
+using HON.Academy.DAL.Model;
 
-namespace HON.Orders.Data.Extensions;
-
-public static class DbContextExtensions
+namespace HON.Academy.DAL.Services
 {
-    public static async Task SeedAsync(this HonOrdersDbContext context, CancellationToken cancellationToken = default)
+    public interface ICourseService
     {
-        if (await context.Customers.AnyAsync(cancellationToken))
-        {
-            return;
-        }
-
-        var customers = new[]
-        {
-            new Customer { Name = "Alice Smith", Email = "alice@example.com" },
-            new Customer { Name = "Bob Lee", Email = "bob@example.com" },
-            new Customer { Name = "Carol Jones", Email = "carol@example.com" }
-        };
-
-        var products = new[]
-        {
-            new Product { Name = "HON Notebook", Sku = "HON-001", UnitPrice = 29.99m, Category = "Office", StockQuantity = 100 },
-            new Product { Name = "HON Pen", Sku = "HON-002", UnitPrice = 4.99m, Category = "Office", StockQuantity = 250 },
-            new Product { Name = "HON Mug", Sku = "HON-003", UnitPrice = 12.50m, Category = "Merch", StockQuantity = 80 }
-        };
-
-        await context.Customers.AddRangeAsync(customers, cancellationToken);
-        await context.Products.AddRangeAsync(products, cancellationToken);
-        await context.SaveChangesAsync(cancellationToken);
+        Task<List<StudentPerformanceDTO>> GetTopStudentsAsync();
+        Task<List<Course>> SearchCoursesAsync(decimal? minFee, decimal? maxFee, int? duration, string specialization, string keyword);
     }
 }`
   },
   {
-    id: 'data-queryservice',
-    name: 'OrderQueryService.cs',
-    path: 'HON.Orders.Data/Services/OrderQueryService.cs',
+    id: 'service-courseservice',
+    name: 'CourseServices.cs',
+    path: 'HON.Academy.DAL/Services/CourseServices.cs',
     readOnly: false,
-    content: `using HON.Orders.Domain.Entities;
+    content: `using HON.Academy.DAL.Data;
+using HON.Academy.DAL.DataTransferObject;
+using HON.Academy.DAL.Model;
 using Microsoft.EntityFrameworkCore;
-using System.Runtime.CompilerServices;
 
-namespace HON.Orders.Data.Services;
-
-public class OrderQueryService
+namespace HON.Academy.DAL.Services
 {
-    private readonly HonOrdersDbContext _context;
-
-    public OrderQueryService(HonOrdersDbContext context)
+    // TODO:Task 1.1 & 1.2 - Implement course query services
+    public class CourseServices : ICourseService
     {
-        _context = context;
-    }
+        private readonly AppDbContext _context;
 
-    public async Task<List<TopCustomerDto>> GetTopCustomersByRevenueAsync(DateTime since, CancellationToken cancellationToken = default)
-    {
-        return await _context.Orders
-            .Where(o => o.OrderDate >= since)
-            .SelectMany(o => o.OrderItems, (o, oi) => new { o.Customer, oi })
-            .Where(x => x.Customer != null)
-            .GroupBy(x => x.Customer!.Name)
-            .Select(g => new TopCustomerDto
-            {
-                CustomerName = g.Key,
-                OrdersCount = g.Select(x => x.oi.OrderId).Distinct().Count(),
-                Revenue = g.Sum(x => x.oi.LineTotal)
-            })
-            .OrderByDescending(x => x.Revenue)
-            .Take(5)
-            .ToListAsync(cancellationToken);
-    }
-
-    public async IAsyncEnumerable<Order> StreamOrdersAsync(DateTime since, [EnumeratorCancellation] CancellationToken cancellationToken = default)
-    {
-        var query = _context.Orders
-            .Where(x => x.OrderDate >= since)
-            .OrderBy(x => x.OrderDate)
-            .AsAsyncEnumerable();
-
-        await foreach (var order in query.WithCancellation(cancellationToken))
+        public CourseServices(AppDbContext context)
         {
-            yield return order;
+            _context = context;
+        }
+
+        public async Task<List<StudentPerformanceDTO>> GetTopStudentsAsync()
+        {
+            // TODO: Task 1.1 - Query Results, group by Student+Course, calculate average score, return top 5
+            throw new NotImplementedException();
+        }
+
+        public async Task<List<Course>> SearchCoursesAsync(decimal? minFee, decimal? maxFee, int? duration, string specialization, string keyword)
+        {
+            // TODO: Task 1.2 - Query Courses, apply optional filters (minFee, maxFee, duration, keyword, specialization)
+            throw new NotImplementedException();
         }
     }
-}
+}`
+  },
+  {
+    id: 'web-coursecontroller',
+    name: 'CourseController.cs',
+    path: 'HON.Academy.Web/Controllers/CourseController.cs',
+    readOnly: false,
+    content: `using HON.Academy.DAL.DataTransferObject;
+using HON.Academy.DAL.Services;
+using Microsoft.AspNetCore.Mvc;
 
-public sealed class TopCustomerDto
+namespace HON.Academy.Web.Controllers
 {
-    public string CustomerName { get; set; } = null!;
-    public int OrdersCount { get; set; }
-    public decimal Revenue { get; set; }
+    public class CourseController : Controller
+    {
+        private readonly ICourseService _service;
+
+        // TODO: Task 3.1 - Implement constructor injection
+        public CourseController(ICourseService service)
+        {
+            throw new NotImplementedException();
+        }
+
+        // TODO: Task 3.2 - Implement TopStudents action to return top students view
+        [HttpGet]
+        public async Task<IActionResult> TopStudents()
+        {
+            throw new NotImplementedException();
+        }
+
+        // TODO: Task 3.3 - Implement Course search with GET (display form) and POST (search)
+        [HttpGet]
+        public IActionResult Search()
+        {
+            throw new NotImplementedException();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Search(CourseDTO vm)
+        {
+            throw new NotImplementedException();
+        }
+    }
 }`
   },
   {
     id: 'web-program',
     name: 'Program.cs',
-    path: 'HON.Orders.Web/Program.cs',
+    path: 'HON.Academy.Web/Program.cs',
     readOnly: false,
-    content: `using HON.Orders.Data;
-using HON.Orders.Data.Extensions;
-using HON.Orders.Web.Filters;
+    content: `using HON.Academy.DAL.Data;
+using HON.Academy.DAL.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllersWithViews(options =>
-{
-    options.Filters.Add<ExecutionTimingFilter>();
-});
+builder.Services.AddControllersWithViews();
 
-builder.Services.AddDbContext<HonOrdersDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("HonOrders") ?? "Server=(localdb)\mssqllocaldb;Database=HonOrdersDb;Trusted_Connection=True;"));
+// TODO: Task 2.2 - Register ICourseService and CourseServices with dependency injection
+// builder.Services.AddScoped<ICourseService, CourseServices>();
 
-builder.Services.AddScoped<ExecutionTimingFilter>();
- builder.Services.AddScoped<AdminRoleFilter>();
+// TODO: Task 2.3 - Configure DbContext with SQLite provider
+// builder.Services.AddDbContext<AppDbContext>(options =>
+//     options.UseSqlite("Data Source=HONAcademyDB.db"));
 
 var app = builder.Build();
-
-using (var scope = app.Services.CreateScope())
-{
-    var context = scope.ServiceProvider.GetRequiredService<HonOrdersDbContext>();
-    context.Database.EnsureCreated();
-    await context.SeedAsync();
-}
 
 if (!app.Environment.IsDevelopment())
 {
@@ -496,12 +292,7 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
-
 app.UseAuthorization();
-
-app.MapControllerRoute(
-    name: "areas",
-    pattern: "{area:exists}/{controller=Home}/{action=Index}/{id?}");
 
 app.MapControllerRoute(
     name: "default",
@@ -510,515 +301,124 @@ app.MapControllerRoute(
 app.Run();`
   },
   {
-    id: 'web-homecontroller',
-    name: 'HomeController.cs',
-    path: 'HON.Orders.Web/Controllers/HomeController.cs',
+    id: 'test-sampletests',
+    name: 'SampleTests.cs',
+    path: 'HON.Academy.XunitTests/SampleTests.cs',
     readOnly: false,
-    content: `using System.Diagnostics;
-using HON.Orders.Data;
-using HON.Orders.Data.Services;
-using HON.Orders.Web.Models;
-using Microsoft.AspNetCore.Mvc;
+    content: `using Xunit;
+
+namespace HON.Academy.XunitTests
+{
+    public class SampleTests
+    {
+        [Fact]
+        public void Sanity()
+        {
+            Assert.True(true);
+        }
+    }
+}`
+  },
+  {
+    id: 'test-courseservicestests',
+    name: 'CourseServicesTests.cs',
+    path: 'HON.Academy.XunitTests/CourseServicesTests.cs',
+    readOnly: false,
+    content: `using HON.Academy.DAL.Data;
+using HON.Academy.DAL.Model;
+using HON.Academy.DAL.Services;
 using Microsoft.EntityFrameworkCore;
+using Xunit;
 
-namespace HON.Orders.Web.Controllers;
-
-public class HomeController : Controller
+namespace HON.Academy.XunitTests
 {
-    private readonly OrderQueryService _queryService;
-    private readonly HonOrdersDbContext _context;
-
-    public HomeController(OrderQueryService queryService, HonOrdersDbContext context)
+    public class CourseServicesTests
     {
-        _queryService = queryService;
-        _context = context;
-    }
-
-    public async Task<IActionResult> Index()
-    {
-        var since = DateTime.UtcNow.AddDays(-30);
-        var topCustomers = await _queryService.GetTopCustomersByRevenueAsync(since);
-        var recentOrders = await _context.Orders
-            .OrderByDescending(x => x.OrderDate)
-            .Take(5)
-            .Select(x => new RecentOrderViewModel
-            {
-                OrderNumber = x.OrderNumber,
-                CustomerName = x.Customer != null ? x.Customer.Name : "Unknown",
-                OrderDate = x.OrderDate,
-                Total = x.Total,
-                Status = x.Status
-            })
-            .ToListAsync();
-
-        var model = new HomeIndexViewModel
+        private AppDbContext CreateContext(string dbName)
         {
-            TopCustomers = topCustomers.Select(x => new TopCustomerViewModel
-            {
-                CustomerName = x.CustomerName,
-                OrdersCount = x.OrdersCount,
-                Revenue = x.Revenue
-            }).ToList(),
-            RecentOrders = recentOrders
-        };
-
-        return View(model);
-    }
-
-    public IActionResult Privacy()
-    {
-        return View();
-    }
-
-    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
-    public IActionResult Error()
-    {
-        return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
-    }
-}`
-  },
-  {
-    id: 'web-ordercontroller',
-    name: 'OrderController.cs',
-    path: 'HON.Orders.Web/Controllers/OrderController.cs',
-    readOnly: false,
-    content: `using HON.Orders.Data;
-using HON.Orders.Domain.Entities;
-using HON.Orders.Web.Models;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-
-namespace HON.Orders.Web.Controllers;
-
-// task3.4 - Customer order form with dynamic line items and validation
-public class OrderController : Controller
-{
-    private readonly HonOrdersDbContext _context;
-
-    public OrderController(HonOrdersDbContext context)
-    {
-        _context = context;
-    }
-
-    public async Task<IActionResult> Create()
-    {
-        var customers = await _context.Customers.AsNoTracking().ToListAsync();
-        var products = await _context.Products.AsNoTracking().ToListAsync();
-
-        return View(new CreateOrderModel
-        {
-            Customers = customers,
-            Products = products,
-            LineItems = new List<OrderLineItemModel> { new() }
-        });
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(CreateOrderModel model)
-    {
-        if (!ModelState.IsValid)
-        {
-            model.Customers = await _context.Customers.AsNoTracking().ToListAsync();
-            model.Products = await _context.Products.AsNoTracking().ToListAsync();
-            return View(model);
+            var options = new DbContextOptionsBuilder<AppDbContext>()
+                .UseInMemoryDatabase(databaseName: dbName)
+                .Options;
+            return new AppDbContext(options);
         }
 
-        var order = new Order
+        [Fact]
+        public async Task GetTopStudentsAsync_Returns_TopStudentEntry()
         {
-            OrderNumber = $"HON-{DateTime.UtcNow:yyyyMMddHHmmss}",
-            CustomerId = model.CustomerId,
-            OrderDate = DateTime.UtcNow,
-            Status = "Pending",
-            Total = model.LineItems.Sum(x => x.Quantity * x.UnitPrice)
-        };
+            using var context = CreateContext(nameof(GetTopStudentsAsync_Returns_TopStudentEntry));
+            var student = new Student { Id = 1, Name = "Alice", Email = "a@x.com", EnrollmentDate = DateTime.UtcNow };
+            var course = new Course { Id = 1, Title = "Math", Code = "M01", Fee = 100, DurationWeeks = 4 };
+            var assignment = new Assignment { Id = 1, CourseId = course.Id, Title = "Exam", MaxScore = 100 };
 
-        order.OrderItems.AddRange(model.LineItems.Select(item => new OrderItem
-        {
-            ProductId = item.ProductId,
-            Quantity = item.Quantity,
-            UnitPrice = item.UnitPrice,
-            LineTotal = item.Quantity * item.UnitPrice
-        }));
+            context.Students.Add(student);
+            context.Courses.Add(course);
+            context.Assignments.Add(assignment);
+            context.Results.Add(new Result { Id = 1, AssignmentId = assignment.Id, StudentId = student.Id, Score = 95 });
+            context.SaveChanges();
 
-        _context.Orders.Add(order);
-        await _context.SaveChangesAsync();
+            var svc = new CourseServices(context);
+            var top = await svc.GetTopStudentsAsync();
 
-        TempData["Message"] = "Order created successfully.";
-        return RedirectToAction(nameof(Create));
-    }
-}`
-  },
-  {
-    id: 'web-admin-products',
-    name: 'ProductsController.cs',
-    path: 'HON.Orders.Web/Areas/Admin/Controllers/ProductsController.cs',
-    readOnly: false,
-    content: `using HON.Orders.Data;
-using HON.Orders.Domain.Entities;
-using HON.Orders.Web.Models.Admin;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-
-namespace HON.Orders.Web.Areas.Admin.Controllers;
-
-[Area("Admin")]
-// task3.3 - Admin CRUD operations for Products with PRG and TempData notifications
-public class ProductsController : Controller
-{
-    private readonly HonOrdersDbContext _context;
-
-    public ProductsController(HonOrdersDbContext context)
-    {
-        _context = context;
-    }
-
-    public async Task<IActionResult> Index()
-    {
-        var products = await _context.Products.AsNoTracking().ToListAsync();
-        return View(products);
-    }
-
-    public IActionResult Create()
-    {
-        return View(new ProductEditModel());
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(ProductEditModel model)
-    {
-        if (!ModelState.IsValid)
-        {
-            return View(model);
+            Assert.NotNull(top);
+            Assert.True(top.Count >= 1);
         }
 
-        var product = new Product
+        [Fact]
+        public async Task SearchCoursesAsync_Filters_ByFeeDurationKeywordAndSpecialization()
         {
-            Name = model.Name,
-            Sku = model.Sku,
-            UnitPrice = model.UnitPrice,
-            Category = model.Category,
-            StockQuantity = model.StockQuantity
-        };
+            using var context = CreateContext(nameof(SearchCoursesAsync_Filters_ByFeeDurationKeywordAndSpecialization));
+            var instructor = new Instructor { Id = 1, Name = "Dr. X", Email = "x@x.com", Specialization = "Dot Net" };
+            context.Instructors.Add(instructor);
+            
+            var course1 = new Course { Id = 10, Title = "ASP.NET Core", Code = "NET01", Fee = 5000m, DurationWeeks = 6 };
+            var course2 = new Course { Id = 11, Title = "Angular Basics", Code = "ANG01", Fee = 3000m, DurationWeeks = 4 };
+            context.Courses.AddRange(course1, course2);
+            
+            var enrollment = new Enrollment { Id = 100, StudentId = 1, CourseId = course1.Id, InstructorId = instructor.Id, Status = "Active", CompletionPercent = 0, EnrolledOn = DateTime.UtcNow };
+            context.Enrollments.Add(enrollment);
+            context.SaveChanges();
 
-        _context.Products.Add(product);
-        await _context.SaveChangesAsync();
+            var svc = new CourseServices(context);
+            var results = await svc.SearchCoursesAsync(minFee: 4000m, maxFee: null, duration: 6, specialization: "Dot Net", keyword: "ASP.NET");
 
-        TempData["Message"] = "Product created successfully.";
-        return RedirectToAction(nameof(Index));
-    }
-
-    public async Task<IActionResult> Edit(int id)
-    {
-        var product = await _context.Products.FindAsync(id);
-        if (product is null)
-        {
-            return NotFound();
-        }
-
-        return View(new ProductEditModel
-        {
-            Id = product.Id,
-            Name = product.Name,
-            Sku = product.Sku,
-            UnitPrice = product.UnitPrice,
-            Category = product.Category,
-            StockQuantity = product.StockQuantity
-        });
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(ProductEditModel model)
-    {
-        if (!ModelState.IsValid)
-        {
-            return View(model);
-        }
-
-        var product = await _context.Products.FindAsync(model.Id);
-        if (product is null)
-        {
-            return NotFound();
-        }
-
-        product.Name = model.Name;
-        product.Sku = model.Sku;
-        product.UnitPrice = model.UnitPrice;
-        product.Category = model.Category;
-        product.StockQuantity = model.StockQuantity;
-
-        await _context.SaveChangesAsync();
-
-        TempData["Message"] = "Product updated successfully.";
-        return RedirectToAction(nameof(Index));
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Delete(int id)
-    {
-        var product = await _context.Products.FindAsync(id);
-        if (product is null)
-        {
-            return NotFound();
-        }
-
-        product.IsDeleted = true;
-        await _context.SaveChangesAsync();
-
-        TempData["Message"] = "Product deleted successfully.";
-        return RedirectToAction(nameof(Index));
-    }
-}`
-  },
-  {
-    id: 'web-view-home',
-    name: 'Index.cshtml',
-    path: 'HON.Orders.Web/Views/Home/Index.cshtml',
-    readOnly: false,
-    content: `@* task1.2 / task1.3 - Dashboard view for top customers and recent orders *@
-@model HON.Orders.Web.Models.HomeIndexViewModel
-
-@{
-    ViewData["Title"] = "HON Orders Dashboard";
-}
-
-<div class="row mb-5">
-    <div class="col-md-8">
-        <h1>HON Orders Dashboard</h1>
-        <p class="lead">Monitor recent orders, top customers, and launch the admin product catalog.</p>
-    </div>
-    <div class="col-md-4 text-md-end">
-        <a asp-area="Admin" asp-controller="Products" asp-action="Index" class="btn btn-primary">Admin Product List</a>
-        <a asp-controller="Order" asp-action="Create" class="btn btn-outline-secondary">Create Order</a>
-    </div>
-</div>
-
-<div class="row g-4">
-    <div class="col-lg-6">
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <h2 class="card-title">Top Customers</h2>
-                <table class="table table-sm mt-3">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Orders</th>
-                            <th>Revenue</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var customer in Model.TopCustomers)
-                        {
-                            <tr>
-                                <td>@customer.CustomerName</td>
-                                <td>@customer.OrdersCount</td>
-                                <td>@customer.Revenue.ToString("C2")</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-6">
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <h2 class="card-title">Recent Orders</h2>
-                <table class="table table-sm mt-3">
-                    <thead>
-                        <tr>
-                            <th>Order</th>
-                            <th>Customer</th>
-                            <th>Date</th>
-                            <th>Total</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var order in Model.RecentOrders)
-                        {
-                            <tr>
-                                <td>@order.OrderNumber</td>
-                                <td>@order.CustomerName</td>
-                                <td>@order.OrderDate.ToString("yyyy-MM-dd")</td>
-                                <td>@order.Total.ToString("C2")</td>
-                                <td>@order.Status</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>`
-  },
-  {
-    id: 'web-model-homeview',
-    name: 'HomeIndexViewModel.cs',
-    path: 'HON.Orders.Web/Models/HomeIndexViewModel.cs',
-    readOnly: false,
-    content: `using HON.Orders.Domain.Entities;
-
-namespace HON.Orders.Web.Models;
-
-public class HomeIndexViewModel
-{
-    public List<TopCustomerViewModel> TopCustomers { get; set; } = new();
-    public List<RecentOrderViewModel> RecentOrders { get; set; } = new();
-}
-
-public sealed class TopCustomerViewModel
-{
-    public string CustomerName { get; set; } = null!;
-    public int OrdersCount { get; set; }
-    public decimal Revenue { get; set; }
-}
-
-public sealed class RecentOrderViewModel
-{
-    public string OrderNumber { get; set; } = null!;
-    public string CustomerName { get; set; } = null!;
-    public DateTime OrderDate { get; set; }
-    public decimal Total { get; set; }
-    public string Status { get; set; } = null!;
-}`
-  },
-  {
-    id: 'web-model-createorder',
-    name: 'CreateOrderModel.cs',
-    path: 'HON.Orders.Web/Models/CreateOrderModel.cs',
-    readOnly: false,
-    content: `using System.ComponentModel.DataAnnotations;
-using HON.Orders.Domain.Entities;
-
-namespace HON.Orders.Web.Models;
-
-public class CreateOrderModel
-{
-    [Required]
-    public int CustomerId { get; set; }
-
-    public List<Customer> Customers { get; set; } = new();
-
-    public List<Product> Products { get; set; } = new();
-
-    public List<OrderLineItemModel> LineItems { get; set; } = new();
-}`
-  },
-  {
-    id: 'web-model-orderlineitem',
-    name: 'OrderLineItemModel.cs',
-    path: 'HON.Orders.Web/Models/OrderLineItemModel.cs',
-    readOnly: false,
-    content: `using System.ComponentModel.DataAnnotations;
-
-namespace HON.Orders.Web.Models;
-
-public class OrderLineItemModel
-{
-    [Required]
-    public int ProductId { get; set; }
-
-    [Required]
-    [Range(1, int.MaxValue)]
-    public int Quantity { get; set; } = 1;
-
-    [Required]
-    public decimal UnitPrice { get; set; }
-}`
-  },
-  {
-    id: 'web-admin-productedit',
-    name: 'ProductEditModel.cs',
-    path: 'HON.Orders.Web/Models/Admin/ProductEditModel.cs',
-    readOnly: false,
-    content: `using System.ComponentModel.DataAnnotations;
-
-namespace HON.Orders.Web.Models.Admin;
-
-public class ProductEditModel
-{
-    public int Id { get; set; }
-
-    [Required]
-    [StringLength(200)]
-    public string Name { get; set; } = null!;
-
-    [Required]
-    [StringLength(50)]
-    public string Sku { get; set; } = null!;
-
-    [Required]
-    [DataType(DataType.Currency)]
-    public decimal UnitPrice { get; set; }
-
-    [Required]
-    [StringLength(100)]
-    public string Category { get; set; } = null!;
-
-    [Required]
-    public int StockQuantity { get; set; }
-}`
-  },
-  {
-    id: 'web-filter-execution',
-    name: 'ExecutionTimingFilter.cs',
-    path: 'HON.Orders.Web/Filters/ExecutionTimingFilter.cs',
-    readOnly: false,
-    content: `using Microsoft.AspNetCore.Mvc.Filters;
-
-namespace HON.Orders.Web.Filters;
-
-// task3.2 - Log execution time and add Server-Timing header
-public class ExecutionTimingFilter : IActionFilter
-{
-    public void OnActionExecuting(ActionExecutingContext context)
-    {
-        context.HttpContext.Items["ActionStart"] = DateTime.UtcNow;
-    }
-
-    public void OnActionExecuted(ActionExecutedContext context)
-    {
-        if (context.HttpContext.Items.TryGetValue("ActionStart", out var startObj)
-            && startObj is DateTime start)
-        {
-            var duration = DateTime.UtcNow - start;
-            context.HttpContext.Response.Headers["Server-Timing"] = $"app;dur={duration.TotalMilliseconds:F0}";
+            Assert.NotNull(results);
+            Assert.Contains(results, c => c.Id == course1.Id);
         }
     }
 }`
   },
   {
-    id: 'web-filter-adminrole',
-    name: 'AdminRoleFilter.cs',
-    path: 'HON.Orders.Web/Filters/AdminRoleFilter.cs',
-    readOnly: false,
-    content: `using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Filters;
+    id: 'readme',
+    name: 'README.md',
+    path: 'README.md',
+    readOnly: true,
+    content: `# MainExam: E-Learning Course Management Platform
 
-namespace HON.Orders.Web.Filters;
+## Overview
+A comprehensive ASP.NET Core MVC application for managing courses, students, assignments, and performance analytics.
 
-// task3.2 - Authorization filter for Admin area role checks
-public class AdminRoleFilter : IAuthorizationFilter
-{
-    public void OnAuthorization(AuthorizationFilterContext context)
-    {
-        var user = context.HttpContext.User;
-        if (!user.Identity?.IsAuthenticated ?? true)
-        {
-            context.Result = new ForbidResult();
-            return;
-        }
+## Projects
+- **HON.Academy.DAL**: Data Access Layer with Entity Framework Core, models, and services
+- **HON.Academy.Web**: ASP.NET Core MVC web application with controllers and views
+- **HON.Academy.XunitTests**: Unit tests for services and business logic
 
-        if (!user.IsInRole("Admin"))
-        {
-            context.Result = new ForbidResult();
-        }
-    }
-}`
+## Tasks
+- Task 1.1: Implement GetTopStudentsAsync() - Returns top 5 students by average score per course
+- Task 1.2: Implement SearchCoursesAsync() - Search courses by fee range, duration, keyword, and specialization
+- Task 3.1: Dependency Injection in CourseController constructor
+- Task 3.2: TopStudents action - Display top-performing students
+- Task 3.3: Course search (GET/POST) - Search and filter available courses
+
+## Running Tests
+\`\`\`bash
+dotnet test HON.Academy.sln
+\`\`\`
+
+## Building & Running
+\`\`\`bash
+dotnet build HON.Academy.sln
+dotnet run --project HON.Academy.Web
+\`\`\``
   }
 ];
 
@@ -1029,7 +429,7 @@ const useIDEStore = create((set) => ({
   activeRightTab: 'problem',
   outputLines: ['Ready to run your code.'],
   testLines: ['Test runner is ready.'],
-  submissionLines: ['Submission summary will appear here.'],
+  submissionLines: [],
   unsavedChanges: false,
   fullscreen: false,
   timerSeconds: 4500,

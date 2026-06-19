@@ -33,7 +33,7 @@ public class AppDbContext : DbContext
 
         // ⭐ Completion constraint
         modelBuilder.Entity<Enrollment>()
-            .HasCheckConstraint("CK_Completion", "[CompletionPercent] BETWEEN 0 AND 100");
+            .ToTable(tb => tb.HasCheckConstraint("CK_Completion", "[CompletionPercent] BETWEEN 0 AND 100"));
 
 
         // ⭐ Relationships (Many-to-many with metadata)

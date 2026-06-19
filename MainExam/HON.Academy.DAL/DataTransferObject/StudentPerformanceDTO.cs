@@ -8,8 +8,8 @@ namespace HON.Academy.DAL.DataTransferObject
 {
     public class StudentPerformanceDTO
         {
-            public string StudentName { get; set; }
-            public string CourseTitle { get; set; }
+            public string StudentName { get; set; } = string.Empty;
+            public string CourseTitle { get; set; } = string.Empty;
             public double AverageScore { get; set; }
         }
 }

@@ -9,6 +9,6 @@ public class Result
     public int StudentId { get; set; }
     public int Score { get; set; }
 
-    public Assignment Assignment { get; set; }
-    public Student Student { get; set; }
+    public Assignment? Assignment { get; set; }
+    public Student? Student { get; set; }
 }

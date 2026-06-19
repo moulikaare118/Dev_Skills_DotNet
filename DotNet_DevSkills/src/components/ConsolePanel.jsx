@@ -12,7 +12,7 @@ export default function ConsolePanel({ activeTab, outputLines, testLines, submis
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${activeTab === tab ? 'bg-sky-500 text-slate-950' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition cursor-pointer ${activeTab === tab ? 'bg-sky-500 text-slate-950' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
             >
               {tab === 'output' ? 'Build Output' : tab === 'tests' ? 'Test Results' : 'Execution Output'}
             </button>
@@ -21,15 +21,15 @@ export default function ConsolePanel({ activeTab, outputLines, testLines, submis
       </div>
 
       <div className="mt-5 min-h-[260px] overflow-auto rounded-3xl bg-slate-950 p-4 text-sm text-slate-100 shadow-inner shadow-slate-900/10">
-        {activeTab === 'output' && outputLines.map((line, index) => (
+        {activeTab === 'output' && (outputLines.length > 0 ? outputLines.map((line, index) => (
           <p key={`${line}-${index}`} className="whitespace-pre-wrap border-b border-slate-800 py-2 text-slate-200">{line}</p>
-        ))}
-        {activeTab === 'tests' && testLines.map((line, index) => (
+        )) : <p className="text-slate-400 py-2">Click Run to see build output...</p>)}
+        {activeTab === 'tests' && (testLines.length > 0 ? testLines.map((line, index) => (
           <p key={`${line}-${index}`} className="whitespace-pre-wrap border-b border-slate-800 py-2 text-slate-200">{line}</p>
-        ))}
-        {activeTab === 'submission' && submissionLines.map((line, index) => (
+        )) : <p className="text-slate-400 py-2">Click Test to run test cases...</p>)}
+        {activeTab === 'submission' && (submissionLines.length > 0 ? submissionLines.map((line, index) => (
           <p key={`${line}-${index}`} className="whitespace-pre-wrap border-b border-slate-800 py-2 text-slate-200">{line}</p>
-        ))}
+        )) : <p className="text-slate-400 py-2">Click Submit to submit your solution...</p>)}
       </div>
     </div>
   );

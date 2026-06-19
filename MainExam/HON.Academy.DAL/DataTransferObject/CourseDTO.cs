@@ -12,8 +12,8 @@ namespace HON.Academy.DAL.DataTransferObject
         public decimal? MinFee { get; set; }
         public decimal? MaxFee { get; set; }
         public int? Duration { get; set; }
-        public string Specialization { get; set; }
-        public string TitleKeyword { get; set; }
+        public string Specialization { get; set; } = string.Empty;
+        public string TitleKeyword { get; set; } = string.Empty;
 
         public List<Course> Results { get; set; } = new List<Course>();
 

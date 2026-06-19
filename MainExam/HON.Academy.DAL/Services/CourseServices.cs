@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 
 namespace HON.Academy.DAL.Services
 {
+    #pragma warning disable CS8602
     public class CourseServices : ICourseService
     {
         private readonly AppDbContext _context;
@@ -30,7 +31,8 @@ namespace HON.Academy.DAL.Services
                 .Include(r => r.Student)
                 .Include(r => r.Assignment)
                     .ThenInclude(a => a.Course)
-                .GroupBy(r => new { r.Student.Name, r.Assignment.Course.Title })
+                .Where(r => r.Student != null && r.Assignment != null && r.Assignment.Course != null)
+                .GroupBy(r => new { Name = r.Student!.Name, Title = r.Assignment!.Course!.Title })
                 .Select(g => new StudentPerformanceDTO
                 {
                     StudentName = g.Key.Name,
@@ -69,7 +71,7 @@ namespace HON.Academy.DAL.Services
 
             if (!string.IsNullOrEmpty(keyword))
             {
-                query = query.Where(c => c.Title.Contains(keyword) || c.Enrollments.Any(e => e.Instructor.Specialization.Contains(keyword)));
+                query = query.Where(c => c.Title.Contains(keyword) || c.Enrollments.Any(e => e.Instructor != null && e.Instructor.Specialization.Contains(keyword)));
             }
 
             return await query.ToListAsync();
@@ -77,3 +79,4 @@ namespace HON.Academy.DAL.Services
         }
     }
 }
+    #pragma warning restore CS8602

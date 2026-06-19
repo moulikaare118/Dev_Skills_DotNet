@@ -10,19 +10,21 @@ import useIDEStore from '../store/useIDEStore';
 import { runCode, runTests, submitSolution } from '../services/api';
 
 const problemMeta = {
-  title: 'HON Orders Assessment',
+  title: 'MainExam: E-Learning Platform',
   difficulty: 'Medium',
-  timeLimit: '90 minutes',
+  timeLimit: '120 minutes',
   language: 'C#',
-  description: 'Build a mini ASP.NET Core MVC order-management assessment with EF Core, MVC pages, and xUnit tests.',
-  inputFormat: 'Read input from the provided editor and execute the .NET solution.',
-  outputFormat: 'Return console output or test results for the submitted C# code.',
-  examples: 'Input: nums = [2,7,11,15]\nTarget: 9\nOutput: [0, 1]',
+  description: 'Build an ASP.NET Core MVC e-learning platform with EF Core database layer, course management, student performance analytics, and xUnit tests.',
+  inputFormat: 'Use the project structure with Models, Services, DTOs, and Controllers. Query data from the in-memory or SQLite database.',
+  outputFormat: 'Return console output, test results, and HTTP responses from the MVC controllers.',
+  examples: 'Task 1.1: Get top 5 students by avg score per course\nTask 1.2: Search courses by fee range, duration, keyword, and instructor specialization\nTask 3.1-3.3: Implement dependency injection, controller actions, and view models',
   instructions: [
-    'Use the editor to update files in the solution explorer.',
-    'Run code, execute tests, and submit when ready.',
-    'Autosave is enabled every 30 seconds.',
-    'Unsaved changes appear in the header badge.'
+    'Implement services in HON.Academy.DAL (Tasks 1.1, 1.2)',
+    'Implement controller actions in HON.Academy.Web (Tasks 3.1, 3.2, 3.3)',
+    'Run unit tests via dotnet test to validate implementations',
+    'Submit the final solution once all tests pass',
+    'Autosave is enabled every 30 seconds',
+    'Project structure includes: Models (Student, Course, Assignment, Result), Services (CourseServices), Controllers (CourseController), DTOs (StudentPerformanceDTO, CourseDTO)'
   ]
 };
 
@@ -58,7 +60,8 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
 
     try {
       const response = await runCode(activeFile?.content || '');
-      setOutputLines([response.output || 'No output returned.']);
+      const lines = response.output ? response.output.split('\n') : ['No output returned.'];
+      setOutputLines(lines);
     } catch (error) {
       setOutputLines([`Error: ${error.message || error}`]);
     }
@@ -70,8 +73,8 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
 
     try {
       const response = await runTests(activeFile?.content || '');
-      const lines = [`Passed: ${response.passed}`, `Failed: ${response.failed}`, `Total: ${response.passed + response.failed}`];
-      setTestLines(lines.concat(response.results?.map((result) => `${result.name}: ${result.passed ? '✓' : '✗'}`) || []));
+      const lines = response.output ? response.output.split('\n') : [`Error: ${response.message || 'Unable to run tests'}`];
+      setTestLines(lines);
     } catch (error) {
       setTestLines([`Error: ${error.message || error}`]);
     }
@@ -145,10 +148,10 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
       <div className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 px-4 py-4 shadow-sm backdrop-blur-md sm:px-6">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="rounded-3xl bg-[#84BD00] px-4 py-2 text-sm font-semibold text-slate-950">HON Orders</div>
+            <div className="rounded-3xl bg-[#84BD00] px-4 py-2 text-sm font-semibold text-slate-950">MainExam</div>
             <div>
-              <p className="text-sm font-semibold text-slate-900">Assessment IDE</p>
-              <p className="text-xs text-slate-500">.NET / C# Coding Assessment</p>
+              <p className="text-sm font-semibold text-slate-900">E-Learning Assessment IDE</p>
+              <p className="text-xs text-slate-500">.NET Core / C# | Course Management Platform</p>
             </div>
           </div>
 

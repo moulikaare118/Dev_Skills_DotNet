@@ -9,7 +9,7 @@ function formatTime(seconds) {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
 }
 
-export default function Timer({ initialSeconds = 12600, onExpire, active = true }) {
+export default function Timer({ initialSeconds = 5400, onExpire, active = true }) {
   const [secondsLeft, setSecondsLeft] = useState(initialSeconds);
 
   useEffect(() => {
