@@ -1,21 +1,5 @@
 export const fallbackWorkspaceFiles = [
   {
-    id: 'solution',
-    name: 'HON.Academy.sln',
-    path: 'HON.Academy.sln',
-    readOnly: true,
-    content: `Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.12.35527.113
-MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HON.Academy.DAL", "HON.Academy.DAL\\HON.Academy.DAL.csproj", "{B024A0F5-86AD-4DAD-BCED-64A33207C3A9}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HON.Academy.Web", "HON.Academy.Web\\HON.Academy.Web.csproj", "{1B8582A2-62F8-47A2-BC49-CF4E33C82C32}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HON.Academy.XunitTests", "HON.Academy.XunitTests\\HON.Academy.XunitTests.csproj", "{3D17E952-17A3-4173-853E-690679205CD4}"
-EndProject`
-  },
-  {
     id: 'model-student',
     name: 'Student.cs',
     path: 'HON.Academy.DAL/Model/Student.cs',

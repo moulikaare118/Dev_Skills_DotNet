@@ -32,6 +32,14 @@ export default function AssessmentDetails({ activeTab, onChangeTab, problemMeta,
           </div>
           <div className="space-y-3">
             <div>
+              <p className="font-semibold text-slate-900">Task</p>
+              <p className="mt-2 text-slate-600">{problemMeta.task}</p>
+            </div>
+            <div>
+              <p className="font-semibold text-slate-900">Solution</p>
+              <p className="mt-2 text-slate-600">{problemMeta.solution}</p>
+            </div>
+            <div>
               <p className="font-semibold text-slate-900">Description</p>
               <p className="mt-2 text-slate-600">{problemMeta.description}</p>
             </div>

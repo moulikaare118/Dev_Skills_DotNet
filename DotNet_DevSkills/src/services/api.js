@@ -54,6 +54,10 @@ export async function runTests(files) {
   return requestJson('/project/tests', { files });
 }
 
+export async function buildAndRunTests(files) {
+  return requestJson('/project/build-and-test', { files });
+}
+
 export async function submitSolution(files) {
   return requestJson('/project/submit', { files });
 }

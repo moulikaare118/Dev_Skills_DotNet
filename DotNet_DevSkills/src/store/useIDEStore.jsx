@@ -4,10 +4,17 @@ import { fallbackWorkspaceFiles } from '../data/fallbackWorkspace';
 
 const initialFiles = fallbackWorkspaceFiles.map((file) => ({ ...file }));
 
+function findDefaultTaskFileId(files) {
+  const taskFile = files.find(
+    (file) => file.path?.endsWith('CourseServices.cs') || file.name === 'CourseServices.cs' || file.id === 'service-courseservice'
+  );
+  return taskFile?.id || files[0]?.id || null;
+}
+
 const defaultState = {
   files: initialFiles,
   originalFiles: initialFiles,
-  activeFileId: initialFiles[0]?.id || null,
+  activeFileId: null,
   activeOutputTab: 'output',
   activeRightTab: 'problem',
   outputLines: ['Ready to run your code.'],
@@ -53,7 +60,9 @@ const useIDEStore = create((set, get) => ({
       set({
         files,
         originalFiles: files,
-        activeFileId: get().activeFileId || firstFileId,
+        activeFileId: files.some((file) => file.id === get().activeFileId)
+          ? get().activeFileId
+          : findDefaultTaskFileId(files),
         workspaceLoaded: true,
         workspaceLoading: false,
         unsavedChanges: false
@@ -63,7 +72,9 @@ const useIDEStore = create((set, get) => ({
       set({
         files,
         originalFiles: files,
-        activeFileId: get().activeFileId || files[0]?.id || null,
+        activeFileId: files.some((file) => file.id === get().activeFileId)
+          ? get().activeFileId
+          : findDefaultTaskFileId(files),
         workspaceLoading: false,
         workspaceLoaded: true,
         workspaceError: `Loaded fallback workspace because the backend was unavailable: ${error?.message || 'Failed to load workspace'}`,

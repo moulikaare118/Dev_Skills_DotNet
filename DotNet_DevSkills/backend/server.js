@@ -173,6 +173,39 @@ function runCommand(command, args, cwd) {
   });
 }
 
+function getDotnetCommand(mode) {
+  if (mode === 'test') {
+    return ['test', 'HON.Academy.XunitTests/HON.Academy.XunitTests.csproj', '--verbosity', 'normal'];
+  }
+
+  return ['build', 'HON.Academy.sln'];
+}
+
+function formatDotnetResult({ command, result }, mode) {
+  const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
+  if (output) {
+    return output;
+  }
+
+  return [
+    `dotnet ${command.join(' ')}`,
+    result.code === 0
+      ? mode === 'test'
+        ? 'All tests passed successfully.'
+        : 'Build completed successfully.'
+      : mode === 'test'
+        ? 'Some tests failed.'
+        : 'Build failed.',
+    'No console output was produced by dotnet.'
+  ].join('\n');
+}
+
+async function runDotnetCommand(projectRoot, mode) {
+  const command = getDotnetCommand(mode);
+  const result = await runCommand('dotnet', command, projectRoot);
+  return { command, result };
+}
+
 async function createProjectWorkspace(files = []) {
   await ensureMainExamProject();
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'devskills-dotnet-'));
@@ -180,6 +213,66 @@ async function createProjectWorkspace(files = []) {
   await copyDirectory(sourceProjectRoot, projectRoot);
   await writeSnapshotFiles(projectRoot, files);
   return { tempRoot, projectRoot };
+}
+
+async function evaluateProject(files, mode) {
+  const { tempRoot, projectRoot } = await createProjectWorkspace(files);
+  try {
+    const result = await runDotnetCommand(projectRoot, mode);
+    return {
+      success: result.result.code === 0,
+      exitCode: result.result.code,
+      output: formatDotnetResult(result, mode),
+      workspaceRoot: projectRoot
+    };
+  } finally {
+    await fs.rm(tempRoot, { recursive: true, force: true });
+  }
+}
+
+async function evaluateProjectBuildAndTest(files) {
+  const { tempRoot, projectRoot } = await createProjectWorkspace(files);
+  try {
+    const buildResult = await runDotnetCommand(projectRoot, 'build');
+    const buildOutput = formatDotnetResult(buildResult, 'build');
+
+    if (buildResult.result.code !== 0) {
+      return {
+        success: false,
+        exitCode: buildResult.result.code,
+        output: buildOutput,
+        buildResult: {
+          success: false,
+          exitCode: buildResult.result.code,
+          output: buildOutput
+        },
+        testResult: null,
+        workspaceRoot: projectRoot
+      };
+    }
+
+    const testResult = await runDotnetCommand(projectRoot, 'test');
+    const testOutput = formatDotnetResult(testResult, 'test');
+
+    return {
+      success: testResult.result.code === 0,
+      exitCode: testResult.result.code,
+      output: [buildOutput, testOutput].filter(Boolean).join('\n\n'),
+      buildResult: {
+        success: true,
+        exitCode: buildResult.result.code,
+        output: buildOutput
+      },
+      testResult: {
+        success: testResult.result.code === 0,
+        exitCode: testResult.result.code,
+        output: testOutput
+      },
+      workspaceRoot: projectRoot
+    };
+  } finally {
+    await fs.rm(tempRoot, { recursive: true, force: true });
+  }
 }
 
 function jsonResponse(res, statusCode, payload) {
@@ -210,49 +303,6 @@ async function loadSolutionFiles() {
   return cloneFiles(await walkTextFiles(sourceProjectRoot));
 }
 
-async function evaluateProject(files, mode) {
-  const { tempRoot, projectRoot } = await createProjectWorkspace(files);
-  try {
-    if (mode === 'test' && hasStarterScaffolding(files)) {
-      return {
-        success: false,
-        exitCode: 1,
-        output: [
-          'Test run blocked.',
-          'Starter TODO / scaffold code is still present.',
-          'Complete the implementation before running tests.'
-        ].join('\n'),
-        workspaceRoot: projectRoot
-      };
-    }
-
-    const command = mode === 'test'
-      ? ['test', 'HON.Academy.sln', '-v', 'normal', '--logger', 'console;verbosity=normal']
-      : ['build', 'HON.Academy.sln'];
-    const result = await runCommand('dotnet', command, projectRoot);
-    const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
-    const fallbackOutput = mode === 'test'
-      ? [
-          `dotnet ${command.join(' ')}`,
-          result.code === 0 ? 'Test run completed successfully.' : 'Test run failed.',
-          'No console output was produced by dotnet.'
-        ].join('\n')
-      : [
-          `dotnet ${command.join(' ')}`,
-          result.code === 0 ? 'Build completed successfully.' : 'Build failed.',
-          'No console output was produced by dotnet.'
-        ].join('\n');
-    return {
-      success: result.code === 0,
-      exitCode: result.code,
-      output: output || fallbackOutput,
-      workspaceRoot: projectRoot
-    };
-  } finally {
-    await fs.rm(tempRoot, { recursive: true, force: true });
-  }
-}
-
 async function evaluateZip(zipBase64, mode) {
   if (!zipBase64) {
     throw new Error('Missing zip payload.');
@@ -267,21 +317,25 @@ async function evaluateZip(zipBase64, mode) {
 
   const solutionRoot = (await findSolutionRoot(extractRoot)) || extractRoot;
   try {
-    const command = mode === 'test'
-      ? ['test', '-v', 'normal', '--logger', 'console;verbosity=normal']
-      : ['build'];
+    let command;
+    if (mode === 'test') {
+      // Run tests on the specific test project
+      command = ['test', 'HON.Academy.XunitTests/HON.Academy.XunitTests.csproj', '--verbosity', 'normal'];
+    } else {
+      command = ['build'];
+    }
     const result = await runCommand('dotnet', command, solutionRoot);
     const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
     const fallbackOutput = mode === 'test'
       ? [
           `dotnet ${command.join(' ')}`,
-          result.code === 0 ? 'Test run completed successfully.' : 'Test run failed.',
-          'No console output was produced by dotnet.'
+          result.code === 0 ? 'All tests passed successfully.' : 'Some tests failed.',
+          output || 'No console output was produced by dotnet.'
         ].join('\n')
       : [
           `dotnet ${command.join(' ')}`,
           result.code === 0 ? 'Build completed successfully.' : 'Build failed.',
-          'No console output was produced by dotnet.'
+          output || 'No console output was produced by dotnet.'
         ].join('\n');
     return {
       success: result.code === 0,
@@ -309,8 +363,15 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && url.pathname === '/api/workspace') {
-      const files = cloneFiles(fallbackWorkspaceFiles);
-      jsonResponse(res, 200, { files });
+      try {
+        // Load the actual MainExam project files to populate the IDE
+        const files = await loadSolutionFiles();
+        jsonResponse(res, 200, { files });
+      } catch (err) {
+        // Fallback to bundled starter workspace when MainExam cannot be read
+        const files = cloneFiles(fallbackWorkspaceFiles);
+        jsonResponse(res, 200, { files, error: String(err?.message || err) });
+      }
       return;
     }
 
@@ -336,6 +397,13 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && url.pathname === '/api/project/tests') {
       const body = await readJsonBody(req);
       const result = await evaluateProject(body.files || [], 'test');
+      jsonResponse(res, 200, result);
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/project/build-and-test') {
+      const body = await readJsonBody(req);
+      const result = await evaluateProjectBuildAndTest(body.files || []);
       jsonResponse(res, 200, result);
       return;
     }
