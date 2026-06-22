@@ -1,57 +1,46 @@
 using HON.Academy.DAL.DataTransferObject;
 using HON.Academy.DAL.Services;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Cryptography.X509Certificates;
 
-
-public class CourseController : Controller
+namespace HON.Academy.Web.Controllers
 {
-    private readonly ICourseService _service;
-    //TODO:Task 3.1
-    public CourseController(ICourseService service)
+    public class CourseController : Controller
     {
-        // TODO:
-        // 1. Use constructor injection to receive the service instance
-        // 2. Assign injected service to the private readonly field
-        // 3. This enables controller to call business logic without creating objects manually
-        // 4. Follow Dependency Injection best practices
-        _service = service;
-    }
-    //TODO:Task 3.2
-    [HttpGet]
-    public async Task<IActionResult> TopStudents()
-    {
-        // TODO:
-        // 1. Call service to get top students (returns List<StudentPerformanceDTO>)
-        // 2. Do NOT access DbContext directly in controller
-        // 3. Pass DTO list to View
-        // 4. Return View with DTO model
-        var topStudents = await _service.GetTopStudentsAsync();
-        return View(topStudents);
-    }
-    //TODO:Task 3.3
-    [HttpGet]
-    public IActionResult Search()
-    {
-        // TODO:
-        // 1. Create empty CourseDTO view model
-        // 2. This DTO will hold filter inputs and result collection
-        // 3. Pass DTO to View
-        // 4. Return Search page
-        var vm = new CourseDTO();
-        return View(vm);
-    }
-    [HttpPost]
+        private readonly ICourseService _service;
 
-    public async Task<IActionResult> Search(CourseDTO vm)
-    {
-        // TODO:
-        // 1. Call service SearchCoursesAsync using values from CourseDTO
-        // 2. Store returned Course entity list inside vm.Results collection
-        // 3. Do NOT return raw entity list directly to View
-        // 4. Return View with updated CourseDTO
-        var results = await _service.SearchCoursesAsync(vm.MinFee, vm.MaxFee, vm.Duration, vm.Specialization, vm.TitleKeyword);
-        vm.Results = results;
-        return View(vm);
+        // Implements Task 3.1: Controller constructor DI
+        // Description: Receives ICourseService via constructor injection and assigns to private field.
+        public CourseController(ICourseService service)
+        {
+            _service = service;
+        }
+
+        // Implements Task 3.2: TopStudents action
+        // Description: Calls service to get top students (StudentPerformanceDTO list) and returns View.
+        [HttpGet]
+        public async Task<IActionResult> TopStudents()
+        {
+            var topStudents = await _service.GetTopStudentsAsync();
+            return View(topStudents);
+        }
+
+        // Implements Task 3.3: Course Search (GET)
+        // Description: Returns an empty CourseDTO view model for filter inputs.
+        [HttpGet]
+        public IActionResult Search()
+        {
+            var vm = new CourseDTO();
+            return View(vm);
+        }
+
+        // Implements Task 3.3: Course Search (POST)
+        // Description: Calls SearchCoursesAsync with values from CourseDTO, stores results in vm.Results and returns View.
+        [HttpPost]
+        public async Task<IActionResult> Search(CourseDTO vm)
+        {
+            var results = await _service.SearchCoursesAsync(vm.MinFee, vm.MaxFee, vm.Duration, vm.Specialization, vm.TitleKeyword);
+            vm.Results = results;
+            return View(vm);
+        }
     }
 }

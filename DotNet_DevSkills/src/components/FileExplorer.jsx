@@ -3,10 +3,12 @@ import { HiChevronDown, HiChevronRight, HiSearch, HiRefresh, HiSave } from 'reac
 
 export default function FileExplorer({ files, activeFileId, onSelectFile, onSave, onRefresh }) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [expandedPaths, setExpandedPaths] = useState(new Set(['HON.Orders.Domain', 'HON.Orders.Data', 'HON.Orders.Web', 'HON.Orders.Tests']));
+  const [expandedPaths, setExpandedPaths] = useState(new Set(['HON.Academy.DAL', 'HON.Academy.Web', 'HON.Academy.XunitTests']));
 
   const visibleFiles = useMemo(
-    () => files.filter((file) => file.name.toLowerCase().includes(searchTerm.toLowerCase()) || file.path.toLowerCase().includes(searchTerm.toLowerCase())),
+    () => files
+      .filter((file) => !file.name.toLowerCase().endsWith('.sln'))
+      .filter((file) => file.name.toLowerCase().includes(searchTerm.toLowerCase()) || file.path.toLowerCase().includes(searchTerm.toLowerCase())),
     [files, searchTerm]
   );
 
@@ -102,7 +104,7 @@ export default function FileExplorer({ files, activeFileId, onSelectFile, onSave
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3 rounded-3xl bg-slate-50 p-4 shadow-sm">
+      {/* <div className="flex items-center justify-between gap-3 rounded-3xl bg-slate-50 p-4 shadow-sm">
         <div>
           <p className="text-sm font-semibold text-slate-900">Solution Explorer</p>
           <p className="text-xs text-slate-500">Folder tree on the left</p>
@@ -122,21 +124,21 @@ export default function FileExplorer({ files, activeFileId, onSelectFile, onSave
             className="w-full rounded-3xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-sky-400"
           />
         </div>
-      </div>
+      </div> */}
 
       <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-slate-500">Project Tree</div>
         <div className="space-y-1">{fileTree.map((node) => renderNode(node))}</div>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+      {/* <div className="flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
         <button onClick={onSave} className="inline-flex items-center justify-center gap-2 rounded-3xl bg-[#84BD00] px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-500">
           <HiSave className="h-4 w-4" /> Save Changes
         </button>
         <button onClick={onRefresh} className="inline-flex items-center justify-center gap-2 rounded-3xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200">
           <HiRefresh className="h-4 w-4" /> Refresh Files
         </button>
-      </div>
+      </div> */}
     </div>
   );
 }

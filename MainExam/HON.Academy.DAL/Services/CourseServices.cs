@@ -15,6 +15,10 @@ namespace HON.Academy.DAL.Services
             _context = context;
         }
 
+        // Implements Task 1.1: Get top 5 students by average score per course
+        // Description: Queries Results including Student and Assignment->Course,
+        // groups by student and course, computes average score, projects to StudentPerformanceDTO,
+        // orders by average descending and returns top 5.
         public async Task<List<StudentPerformanceDTO>> GetTopStudentsAsync()
         {
             var topStudents = await _context.Results
@@ -36,6 +40,9 @@ namespace HON.Academy.DAL.Services
             return topStudents;
         }
 
+        // Implements Task 1.2: Course search with optional filters
+        // Description: Queries Courses including Enrollments->Instructor and applies optional filters
+        // (minFee, maxFee, duration, specialization, keyword) before returning matching Course entities.
         public async Task<List<Course>> SearchCoursesAsync(decimal? minFee, decimal? maxFee, int? duration, string specialization, string keyword)
         {
             var query = _context.Courses

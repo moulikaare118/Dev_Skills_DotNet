@@ -1,5 +1,3 @@
-import assessmentFallback from '../../backend/assessment-data.json';
-
 const API_BASE = '/api';
 
 async function requestJson(path, payload) {
@@ -29,17 +27,13 @@ export async function loadWorkspace(mode = 'starter') {
 }
 
 export async function loadAssessmentMeta() {
-  try {
-    const response = await fetch(`${API_BASE}/assessment/meta`);
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || 'Failed to load assessment metadata');
-    }
-
-    return response.json();
-  } catch {
-    return assessmentFallback;
+  const response = await fetch(`${API_BASE}/assessment/meta`);
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'Failed to load assessment metadata');
   }
+
+  return response.json();
 }
 
 export async function loadSolutionWorkspace() {

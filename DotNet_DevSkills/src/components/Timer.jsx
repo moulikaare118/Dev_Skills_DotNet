@@ -9,7 +9,7 @@ function formatTime(seconds) {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
 }
 
-export default function Timer({ initialSeconds = 5400, onExpire, active = true }) {
+export default function Timer({ initialSeconds = 5400, onExpire, active = true, resetSignal = 0 }) {
   const [secondsLeft, setSecondsLeft] = useState(initialSeconds);
 
   useEffect(() => {
@@ -18,9 +18,21 @@ export default function Timer({ initialSeconds = 5400, onExpire, active = true }
       const savedSeconds = parseInt(saved, 10);
       if (!Number.isNaN(savedSeconds) && savedSeconds >= 0) {
         setSecondsLeft(savedSeconds);
+        return;
       }
     }
-  }, []);
+
+    setSecondsLeft(initialSeconds);
+  }, [initialSeconds]);
+
+  useEffect(() => {
+    if (resetSignal === 0) {
+      return;
+    }
+
+    setSecondsLeft(initialSeconds);
+    window.localStorage.setItem(STORAGE_KEY, String(initialSeconds));
+  }, [resetSignal, initialSeconds]);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, String(secondsLeft));

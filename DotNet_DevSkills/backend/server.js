@@ -4,12 +4,12 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
-import { fallbackWorkspaceFiles } from '../src/data/fallbackWorkspace.js';
 
 const backendDir = path.dirname(fileURLToPath(import.meta.url));
 const frontendRoot = path.resolve(backendDir, '..');
 const workspaceRoot = path.resolve(frontendRoot, '..');
-const sourceProjectRoot = path.join(workspaceRoot, 'MainExam');
+const starterProjectRoot = path.join(workspaceRoot, 'MainExam_Todos');
+const solutionProjectRoot = path.join(workspaceRoot, 'MainExam');
 const assessmentDataPath = path.join(backendDir, 'assessment-data.json');
 const host = process.env.HOST || '127.0.0.1';
 const port = Number(process.env.PORT || 8787);
@@ -67,16 +67,33 @@ function cloneFiles(files) {
   return files.map((file) => ({ ...file }));
 }
 
+function isRelevantScaffoldFile(file) {
+  const filePath = (file?.path || '').toLowerCase();
+  if (!filePath) {
+    return false;
+  }
+
+  if (filePath.startsWith('hon.academy.web/wwwroot/') || filePath.includes('/wwwroot/lib/') || filePath.includes('/node_modules/')) {
+    return false;
+  }
+
+  return filePath.endsWith('.cs') || filePath.endsWith('.cshtml') || filePath.endsWith('.razor');
+}
+
 function hasStarterScaffolding(files) {
   return files.some((file) => {
+    if (!isRelevantScaffoldFile(file)) {
+      return false;
+    }
+
     const content = typeof file?.content === 'string' ? file.content : '';
     return content.includes('TODO') || content.includes('NotImplementedException') || content.includes('throw new NotImplementedException()');
   });
 }
 
-async function ensureMainExamProject() {
-  if (!(await fileExists(sourceProjectRoot))) {
-    throw new Error(`Could not find MainExam workspace at ${sourceProjectRoot}`);
+async function ensureProjectRoot(projectRoot, label) {
+  if (!(await fileExists(projectRoot))) {
+    throw new Error(`Could not find ${label} workspace at ${projectRoot}`);
   }
 }
 
@@ -173,6 +190,7 @@ function runCommand(command, args, cwd) {
   });
 }
 
+<<<<<<< HEAD
 function getDotnetCommand(mode) {
   if (mode === 'test') {
     return ['test', 'HON.Academy.XunitTests/HON.Academy.XunitTests.csproj', '--verbosity', 'normal'];
@@ -208,9 +226,13 @@ async function runDotnetCommand(projectRoot, mode) {
 
 async function createProjectWorkspace(files = []) {
   await ensureMainExamProject();
+=======
+async function createProjectWorkspace(files = [], templateRoot = starterProjectRoot) {
+  await ensureProjectRoot(templateRoot, 'project');
+>>>>>>> 593e1f5 (Final Commit)
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'devskills-dotnet-'));
   const projectRoot = path.join(tempRoot, 'MainExam');
-  await copyDirectory(sourceProjectRoot, projectRoot);
+  await copyDirectory(templateRoot, projectRoot);
   await writeSnapshotFiles(projectRoot, files);
   return { tempRoot, projectRoot };
 }
@@ -299,10 +321,123 @@ async function loadAssessmentData() {
   return JSON.parse(raw);
 }
 
-async function loadSolutionFiles() {
-  return cloneFiles(await walkTextFiles(sourceProjectRoot));
+async function loadWorkspaceFiles() {
+  return cloneFiles(await walkTextFiles(starterProjectRoot));
 }
 
+async function loadSolutionFiles() {
+  return cloneFiles(await walkTextFiles(solutionProjectRoot));
+}
+
+function parseTestOutput(output) {
+  const lines = output.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const summary = {
+    total: 0,
+    passed: 0,
+    failed: 0,
+    skipped: 0,
+    duration: null
+  };
+  const testCases = [];
+  let currentFailedTest = null;
+
+  for (const line of lines) {
+    const resultMatch = line.match(/^(Passed|Failed|Skipped)\s+(.+?)\s+\[(.+?)\]$/);
+    if (resultMatch) {
+      const [, status, fullName, duration] = resultMatch;
+      const testCase = {
+        name: fullName.trim(),
+        status: status.toLowerCase(),
+        duration: duration.trim(),
+        failureMessage: ''
+      };
+      testCases.push(testCase);
+      if (status === 'Passed') summary.passed += 1;
+      if (status === 'Failed') {
+        summary.failed += 1;
+        currentFailedTest = testCase;
+      }
+      if (status === 'Skipped') summary.skipped += 1;
+      continue;
+    }
+
+    const totalMatch = line.match(/^(Total tests|Total):\s*(\d+)/i);
+    if (totalMatch && !summary.total) {
+      summary.total = Number(totalMatch[2]);
+      continue;
+    }
+
+    const passedMatch = line.match(/^Passed:\s*(\d+)/i);
+    if (passedMatch) {
+      summary.passed = Number(passedMatch[1]);
+      continue;
+    }
+
+    const failedMatch = line.match(/^(Failed|Failures?):\s*(\d+)/i);
+    if (failedMatch) {
+      summary.failed = Number(failedMatch[2]);
+      continue;
+    }
+
+    const skippedMatch = line.match(/^Skipped:\s*(\d+)/i);
+    if (skippedMatch) {
+      summary.skipped = Number(skippedMatch[1]);
+      continue;
+    }
+
+    const durationMatch = line.match(/^(Total time|duration):\s*(.+)$/i);
+    if (durationMatch) {
+      summary.duration = durationMatch[2].trim();
+      continue;
+    }
+
+    if (currentFailedTest && !line.startsWith('xUnit.net') && !line.startsWith('A total of') && !line.startsWith('Test Run') && !/^(Total tests|Passed|Failed|Skipped|Total time|duration):/i.test(line)) {
+      currentFailedTest.failureMessage += `${line}\n`;
+    }
+  }
+
+  if (!summary.total && summary.passed + summary.failed + summary.skipped) {
+    summary.total = summary.passed + summary.failed + summary.skipped;
+  }
+
+  return { summary, testCases };
+}
+
+<<<<<<< HEAD
+=======
+async function evaluateProject(files, mode) {
+  const { tempRoot, projectRoot } = await createProjectWorkspace(files, starterProjectRoot);
+  try {
+    const command = mode === 'test'
+      ? ['test', 'HON.Academy.sln', '-v', 'normal', '--logger', 'console;verbosity=normal']
+      : ['build', 'HON.Academy.sln'];
+    const result = await runCommand('dotnet', command, projectRoot);
+    const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
+    const finalOutput = output || [
+      `dotnet ${command.join(' ')}`,
+      result.code === 0 ? `${mode === 'test' ? 'Test run completed successfully.' : 'Build completed successfully.'}` : `${mode === 'test' ? 'Test run failed.' : 'Build failed.'}`,
+      'No console output was produced by dotnet.'
+    ].join('\n');
+    const response = {
+      success: result.code === 0,
+      exitCode: result.code,
+      output: finalOutput,
+      workspaceRoot: projectRoot
+    };
+
+    if (mode === 'test') {
+      const { summary, testCases } = parseTestOutput(finalOutput);
+      response.testSummary = summary;
+      response.testCases = testCases;
+    }
+
+    return response;
+  } finally {
+    await fs.rm(tempRoot, { recursive: true, force: true });
+  }
+}
+
+>>>>>>> 593e1f5 (Final Commit)
 async function evaluateZip(zipBase64, mode) {
   if (!zipBase64) {
     throw new Error('Missing zip payload.');
@@ -326,6 +461,7 @@ async function evaluateZip(zipBase64, mode) {
     }
     const result = await runCommand('dotnet', command, solutionRoot);
     const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
+<<<<<<< HEAD
     const fallbackOutput = mode === 'test'
       ? [
           `dotnet ${command.join(' ')}`,
@@ -338,11 +474,28 @@ async function evaluateZip(zipBase64, mode) {
           output || 'No console output was produced by dotnet.'
         ].join('\n');
     return {
+=======
+    const finalOutput = output || [
+      `dotnet ${command.join(' ')}`,
+      result.code === 0 ? `${mode === 'test' ? 'Test run completed successfully.' : 'Build completed successfully.'}` : `${mode === 'test' ? 'Test run failed.' : 'Build failed.'}`,
+      'No console output was produced by dotnet.'
+    ].join('\n');
+
+    const response = {
+>>>>>>> 593e1f5 (Final Commit)
       success: result.code === 0,
       exitCode: result.code,
-      output: output || fallbackOutput,
+      output: finalOutput,
       workspaceRoot: solutionRoot
     };
+
+    if (mode === 'test') {
+      const { summary, testCases } = parseTestOutput(finalOutput);
+      response.testSummary = summary;
+      response.testCases = testCases;
+    }
+
+    return response;
   } finally {
     await fs.rm(tempRoot, { recursive: true, force: true });
   }
@@ -363,6 +516,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && url.pathname === '/api/workspace') {
+<<<<<<< HEAD
       try {
         // Load the actual MainExam project files to populate the IDE
         const files = await loadSolutionFiles();
@@ -372,6 +526,10 @@ const server = http.createServer(async (req, res) => {
         const files = cloneFiles(fallbackWorkspaceFiles);
         jsonResponse(res, 200, { files, error: String(err?.message || err) });
       }
+=======
+      const files = await loadWorkspaceFiles();
+      jsonResponse(res, 200, { files });
+>>>>>>> 593e1f5 (Final Commit)
       return;
     }
 
