@@ -190,66 +190,13 @@ function runCommand(command, args, cwd) {
   });
 }
 
-<<<<<<< HEAD
-function getDotnetCommand(mode) {
-  if (mode === 'test') {
-    return ['test', 'HON.Academy.XunitTests/HON.Academy.XunitTests.csproj', '--verbosity', 'normal'];
-  }
-
-  return ['build', 'HON.Academy.sln'];
-}
-
-function formatDotnetResult({ command, result }, mode) {
-  const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
-  if (output) {
-    return output;
-  }
-
-  return [
-    `dotnet ${command.join(' ')}`,
-    result.code === 0
-      ? mode === 'test'
-        ? 'All tests passed successfully.'
-        : 'Build completed successfully.'
-      : mode === 'test'
-        ? 'Some tests failed.'
-        : 'Build failed.',
-    'No console output was produced by dotnet.'
-  ].join('\n');
-}
-
-async function runDotnetCommand(projectRoot, mode) {
-  const command = getDotnetCommand(mode);
-  const result = await runCommand('dotnet', command, projectRoot);
-  return { command, result };
-}
-
-async function createProjectWorkspace(files = []) {
-  await ensureMainExamProject();
-=======
 async function createProjectWorkspace(files = [], templateRoot = starterProjectRoot) {
   await ensureProjectRoot(templateRoot, 'project');
->>>>>>> 593e1f5 (Final Commit)
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'devskills-dotnet-'));
   const projectRoot = path.join(tempRoot, 'MainExam');
   await copyDirectory(templateRoot, projectRoot);
   await writeSnapshotFiles(projectRoot, files);
   return { tempRoot, projectRoot };
-}
-
-async function evaluateProject(files, mode) {
-  const { tempRoot, projectRoot } = await createProjectWorkspace(files);
-  try {
-    const result = await runDotnetCommand(projectRoot, mode);
-    return {
-      success: result.result.code === 0,
-      exitCode: result.result.code,
-      output: formatDotnetResult(result, mode),
-      workspaceRoot: projectRoot
-    };
-  } finally {
-    await fs.rm(tempRoot, { recursive: true, force: true });
-  }
 }
 
 async function evaluateProjectBuildAndTest(files) {
@@ -403,8 +350,6 @@ function parseTestOutput(output) {
   return { summary, testCases };
 }
 
-<<<<<<< HEAD
-=======
 async function evaluateProject(files, mode) {
   const { tempRoot, projectRoot } = await createProjectWorkspace(files, starterProjectRoot);
   try {
@@ -437,7 +382,6 @@ async function evaluateProject(files, mode) {
   }
 }
 
->>>>>>> 593e1f5 (Final Commit)
 async function evaluateZip(zipBase64, mode) {
   if (!zipBase64) {
     throw new Error('Missing zip payload.');
@@ -461,20 +405,6 @@ async function evaluateZip(zipBase64, mode) {
     }
     const result = await runCommand('dotnet', command, solutionRoot);
     const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
-<<<<<<< HEAD
-    const fallbackOutput = mode === 'test'
-      ? [
-          `dotnet ${command.join(' ')}`,
-          result.code === 0 ? 'All tests passed successfully.' : 'Some tests failed.',
-          output || 'No console output was produced by dotnet.'
-        ].join('\n')
-      : [
-          `dotnet ${command.join(' ')}`,
-          result.code === 0 ? 'Build completed successfully.' : 'Build failed.',
-          output || 'No console output was produced by dotnet.'
-        ].join('\n');
-    return {
-=======
     const finalOutput = output || [
       `dotnet ${command.join(' ')}`,
       result.code === 0 ? `${mode === 'test' ? 'Test run completed successfully.' : 'Build completed successfully.'}` : `${mode === 'test' ? 'Test run failed.' : 'Build failed.'}`,
@@ -482,7 +412,6 @@ async function evaluateZip(zipBase64, mode) {
     ].join('\n');
 
     const response = {
->>>>>>> 593e1f5 (Final Commit)
       success: result.code === 0,
       exitCode: result.code,
       output: finalOutput,
@@ -516,20 +445,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && url.pathname === '/api/workspace') {
-<<<<<<< HEAD
-      try {
-        // Load the actual MainExam project files to populate the IDE
-        const files = await loadSolutionFiles();
-        jsonResponse(res, 200, { files });
-      } catch (err) {
-        // Fallback to bundled starter workspace when MainExam cannot be read
-        const files = cloneFiles(fallbackWorkspaceFiles);
-        jsonResponse(res, 200, { files, error: String(err?.message || err) });
-      }
-=======
       const files = await loadWorkspaceFiles();
       jsonResponse(res, 200, { files });
->>>>>>> 593e1f5 (Final Commit)
       return;
     }
 

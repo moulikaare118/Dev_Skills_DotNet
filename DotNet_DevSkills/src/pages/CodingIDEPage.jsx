@@ -129,6 +129,7 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
   const fullscreen = useIDEStore((state) => state.fullscreen);
   const [timeExpired, setTimeExpired] = useState(false);
   const [solutionUnlocked, setSolutionUnlocked] = useState(false);
+  const [timerResetSignal, setTimerResetSignal] = useState(0);
   const workspaceSyncStarted = useRef(false);
   const setActiveFile = useIDEStore((state) => state.setActiveFile);
   const updateFileContent = useIDEStore((state) => state.updateFileContent);

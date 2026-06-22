@@ -76,13 +76,7 @@ const useIDEStore = create((set, get) => ({
       set({
         files,
         originalFiles: files,
-<<<<<<< HEAD
-        activeFileId: files.some((file) => file.id === get().activeFileId)
-          ? get().activeFileId
-          : findDefaultTaskFileId(files),
-=======
         activeFileId: firstFileId,
->>>>>>> 593e1f5 (Final Commit)
         workspaceLoaded: true,
         workspaceLoading: false,
         workspaceMode: mode,
@@ -93,17 +87,9 @@ const useIDEStore = create((set, get) => ({
       });
     } catch (error) {
       set({
-<<<<<<< HEAD
-        files,
-        originalFiles: files,
-        activeFileId: files.some((file) => file.id === get().activeFileId)
-          ? get().activeFileId
-          : findDefaultTaskFileId(files),
-=======
         files: [],
         originalFiles: [],
         activeFileId: null,
->>>>>>> 593e1f5 (Final Commit)
         workspaceLoading: false,
         workspaceLoaded: false,
         workspaceError: `Failed to load workspace: ${error?.message || 'Backend unavailable'}`,
