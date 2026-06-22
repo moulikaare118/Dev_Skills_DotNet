@@ -26,10 +26,7 @@ namespace HON.Academy.DAL.Services
             // 2. Group data by Student Name and Course Title and calculate Average Score
             // 3. Project grouped data into StudentPerformanceDTO (method must return StudentPerformanceDTO, not Result entity)
             // 4. Order by AverageScore descending, take top 5, and execute asynchronously
-<<<<<<< HEAD
-=======
             
->>>>>>> 593e1f5 (Final Commit)
         }
         //TODO:Task 1.2
         public async Task<List<Course>> SearchCoursesAsync(decimal? minFee, decimal? maxFee, int? duration, string specialization, string keyword)

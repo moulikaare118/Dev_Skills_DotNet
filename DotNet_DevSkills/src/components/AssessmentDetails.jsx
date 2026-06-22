@@ -1,4 +1,4 @@
-export default function AssessmentDetails({ activeTab, onChangeTab, problemMeta, onAction }) {
+export default function AssessmentDetails({ activeTab, onChangeTab, problemMeta, onAction, submitted = false }) {
   return (
     <div className="space-y-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-lg shadow-slate-200/20">
       <div className="flex items-center justify-between gap-3">
@@ -78,7 +78,7 @@ export default function AssessmentDetails({ activeTab, onChangeTab, problemMeta,
       {activeTab === 'actions' && (
         <div className="space-y-4 rounded-3xl bg-slate-50 p-5 text-sm text-slate-700">
           <button onClick={() => onAction('hints')} className="w-full rounded-3xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200">View Hints</button>
-          <button onClick={() => onAction('reset')} className="w-full rounded-3xl bg-[#84BD00] px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-500">Reset Solution</button>
+          <button onClick={() => onAction('reset')} disabled={submitted} className="w-full rounded-3xl bg-[#84BD00] px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500">Reset Solution</button>
         </div>
       )}
     </div>

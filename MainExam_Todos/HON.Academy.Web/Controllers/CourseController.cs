@@ -15,11 +15,7 @@ public class CourseController : Controller
         // 2. Assign injected service to the private readonly field
         // 3. This enables controller to call business logic without creating objects manually
         // 4. Follow Dependency Injection best practices
-<<<<<<< HEAD
-        _service = service;
-=======
         
->>>>>>> 593e1f5 (Final Commit)
     }
     //TODO:Task 3.2
     [HttpGet]
@@ -30,11 +26,7 @@ public class CourseController : Controller
         // 2. Do NOT access DbContext directly in controller
         // 3. Pass DTO list to View
         // 4. Return View with DTO model
-<<<<<<< HEAD
-       
-=======
         
->>>>>>> 593e1f5 (Final Commit)
     }
     //TODO:Task 3.3
     [HttpGet]
@@ -45,11 +37,7 @@ public class CourseController : Controller
         // 2. This DTO will hold filter inputs and result collection
         // 3. Pass DTO to View
         // 4. Return Search page
-<<<<<<< HEAD
-        
-=======
     
->>>>>>> 593e1f5 (Final Commit)
     }
     [HttpPost]
 
@@ -60,10 +48,5 @@ public class CourseController : Controller
         // 2. Store returned Course entity list inside vm.Results collection
         // 3. Do NOT return raw entity list directly to View
         // 4. Return View with updated CourseDTO
-<<<<<<< HEAD
-       
-=======
-
->>>>>>> 593e1f5 (Final Commit)
     }
 }

@@ -6,7 +6,7 @@ import AssessmentDetails from '../components/AssessmentDetails';
 import ConsolePanel from '../components/ConsolePanel';
 import Timer from '../components/Timer';
 import useIDEStore from '../store/useIDEStore';
-import { runCode, runTests, buildAndRunTests, submitSolution } from '../services/api';
+import { buildAndRunTests, submitSolution } from '../services/api';
 
 const problemMeta = {
   title: 'MainExam: E-Learning Platform',
@@ -126,9 +126,12 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
   const workspaceLoaded = useIDEStore((state) => state.workspaceLoaded);
   const workspaceLoading = useIDEStore((state) => state.workspaceLoading);
   const workspaceError = useIDEStore((state) => state.workspaceError);
+  const workspaceMode = useIDEStore((state) => state.workspaceMode);
+  const testResults = useIDEStore((state) => state.testSummary);
   const fullscreen = useIDEStore((state) => state.fullscreen);
   const [timeExpired, setTimeExpired] = useState(false);
   const [solutionUnlocked, setSolutionUnlocked] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [timerResetSignal, setTimerResetSignal] = useState(0);
   const workspaceSyncStarted = useRef(false);
   const setActiveFile = useIDEStore((state) => state.setActiveFile);
@@ -137,6 +140,7 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
   const setActiveRightTab = useIDEStore((state) => state.setActiveRightTab);
   const setOutputLines = useIDEStore((state) => state.setOutputLines);
   const setTestLines = useIDEStore((state) => state.setTestLines);
+  const setTestSummary = useIDEStore((state) => state.setTestSummary);
   const setSubmissionLines = useIDEStore((state) => state.setSubmissionLines);
   const saveChanges = useIDEStore((state) => state.saveChanges);
   const resetEditor = useIDEStore((state) => state.resetEditor);
@@ -176,33 +180,44 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
     }
   }, [loadWorkspace]);
 
-  const handleRun = useCallback(async () => {
+  const handleBuildAndRunTests = useCallback(async () => {
     setActiveOutputTab('output');
-    setOutputLines(['Launching code execution...']);
+    setOutputLines(['Building project and running tests...']);
+    setTestLines(['Building project and running tests...']);
+    setTestSummary({ total: 0, passed: 0, failed: 0, skipped: 0, duration: null });
 
     try {
-      const response = await runCode(files);
-      setOutputLines(formatConsoleOutput(response, 'build'));
+      const response = await buildAndRunTests(files);
+      const buildResult = response?.buildResult || response;
+      const testResult = response?.testResult || null;
+
+      setOutputLines(formatConsoleOutput(buildResult, 'build'));
+
+      if (testResult) {
+        setTestLines(formatConsoleOutput(testResult, 'test'));
+        const parsedResults = parseTestResults(testResult.output || response?.output || '');
+        setTestSummary({
+          total: parsedResults.passed + parsedResults.failed,
+          passed: parsedResults.passed,
+          failed: parsedResults.failed,
+          skipped: 0,
+          duration: null
+        });
+      } else {
+        setTestLines(['Tests were not run because the build failed.']);
+        setTestSummary({ total: 0, passed: 0, failed: 0, skipped: 0, duration: null });
+      }
     } catch (error) {
       setOutputLines([`Error: ${error.message || error}`]);
+      setTestLines(['Build and test execution failed.']);
+      setTestSummary({ total: 0, passed: 0, failed: 0, skipped: 0, duration: null });
     }
-  }, [files, formatConsoleOutput, setActiveOutputTab, setOutputLines]);
-
-  const handleTest = useCallback(async () => {
-    setActiveOutputTab('tests');
-    setTestLines(['Running tests...']);
-
-    try {
-      const response = await runTests(files);
-      setTestLines(formatConsoleOutput(response, 'test'));
-    } catch (error) {
-      setTestLines([`Error: ${error.message || error}`]);
-    }
-  }, [files, formatConsoleOutput, setActiveOutputTab, setTestLines]);
+  }, [files, formatConsoleOutput, setActiveOutputTab, setOutputLines, setTestLines, setTestSummary]);
 
   const handleSubmit = useCallback(async () => {
     setActiveOutputTab('submission');
     setSubmissionLines(['Submitting final solution...']);
+    setSubmitted(true);
 
     try {
       const response = await submitSolution(files);
@@ -222,7 +237,7 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
   }, [files, setActiveOutputTab, setSubmissionLines]);
 
   const handleGetSolution = useCallback(async () => {
-    if (!timeExpired && !solutionUnlocked) return;
+    if (!timeExpired && !solutionUnlocked && !submitted) return;
 
     setActiveOutputTab('submission');
     setSubmissionLines(['Loading solution workspace...']);
@@ -230,12 +245,12 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
     try {
       await loadWorkspace('solution');
       setSubmissionLines(['Solution workspace loaded successfully.']);
-      setOutputLines(['Ready to run tests against the solution workspace.']);
+      setOutputLines(['Ready to build and run tests against the solution workspace.']);
       setTestLines(['Test runner is ready.']);
     } catch (error) {
       setSubmissionLines([`Error: ${error.message || 'Unable to load solution workspace'}`]);
     }
-  }, [loadWorkspace, setActiveOutputTab, setSubmissionLines, solutionUnlocked, timeExpired]);
+  }, [loadWorkspace, setActiveOutputTab, setSubmissionLines, solutionUnlocked, submitted, timeExpired]);
 
   const handleAction = useCallback(async (action) => {
     if (action === 'hints') {
@@ -249,6 +264,10 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
     }
 
     if (action === 'reset') {
+      if (submitted) {
+        return;
+      }
+
       setActiveOutputTab('output');
       setActiveRightTab('problem');
       setOutputLines(['Resetting editor to live workspace...']);
@@ -256,6 +275,8 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
       setTestLines(['Test runner is ready.']);
       setSubmitting(false);
       setTestFinished(false);
+      setTimeExpired(false);
+      setSolutionUnlocked(false);
       setTimerResetSignal((value) => value + 1);
       window.localStorage.removeItem('devskills-assessment-timer');
 
@@ -275,7 +296,7 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
       setTestFinished(false);
       setSubmitting(false);
     }
-  }, [resetEditor, setActiveOutputTab, setActiveRightTab, setSubmissionLines, setOutputLines, setTestLines]);
+  }, [resetEditor, setActiveOutputTab, setActiveRightTab, setSubmissionLines, setOutputLines, setTestLines, submitted]);
 
   useEffect(() => {
     const saveInterval = window.setInterval(() => {
@@ -295,17 +316,13 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
       }
       if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
         event.preventDefault();
-        handleRun();
-      }
-      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 't') {
-        event.preventDefault();
-        handleTest();
+        handleBuildAndRunTests();
       }
     };
 
     window.addEventListener('keydown', handleShortcut);
     return () => window.removeEventListener('keydown', handleShortcut);
-  }, [handleRun, handleTest, saveChanges]);
+  }, [handleBuildAndRunTests, saveChanges]);
 
   return (
     <main className="min-h-screen bg-[#F8FAFC] text-slate-900 overflow-x-hidden">
@@ -322,7 +339,7 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
           <div className="flex items-center gap-4">
             <div className="rounded-3xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm">
               <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Time Remaining</p>
-              <Timer active={!timeExpired} onExpire={() => setTimeExpired(true)} resetSignal={timerResetSignal} />
+              <Timer active={!timeExpired && !submitted} onExpire={() => setTimeExpired(true)} resetSignal={timerResetSignal} />
             </div>
             {/* <div className="rounded-3xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm">Candidate: Alex</div> */}
             <ThemeToggle theme={theme} onToggleTheme={onToggleTheme} />
@@ -367,11 +384,10 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <button onClick={handleRun} className="inline-flex items-center gap-2 rounded-3xl bg-[#84BD00] px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-emerald-500">Run</button>
-                  <button onClick={handleTest} className="inline-flex items-center gap-2 rounded-3xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800">Test</button>
+                  <button onClick={handleBuildAndRunTests} className="inline-flex items-center gap-2 rounded-3xl bg-[#84BD00] px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-emerald-500">Build & Run Tests</button>
                   <button onClick={handleSubmit} className="inline-flex items-center gap-2 rounded-3xl bg-sky-500 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-sky-400">Submit</button>
-                  <button onClick={handleGetSolution} disabled={!timeExpired && !solutionUnlocked} className="inline-flex items-center gap-2 rounded-3xl bg-slate-800 px-3 py-2 text-xs font-semibold text-white transition disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 hover:bg-slate-700">Get Solution</button>
-                  <button onClick={resetEditor} className="inline-flex items-center gap-2 rounded-3xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200">Reset</button>
+                  <button onClick={handleGetSolution} disabled={!timeExpired && !solutionUnlocked && !submitted} className="inline-flex items-center gap-2 rounded-3xl bg-slate-800 px-3 py-2 text-xs font-semibold text-white transition disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 hover:bg-slate-700">Get Solution</button>
+                  <button onClick={resetEditor} disabled={submitted} className="inline-flex items-center gap-2 rounded-3xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400">Reset</button>
                 </div>
               </div>
               <div className="h-[calc(100vh-340px)] overflow-hidden rounded-3xl bg-slate-950">
@@ -417,7 +433,7 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
                 testResults={testResults}
               />
               <div className="grid gap-5">
-                <AssessmentDetails activeTab={activeRightTab} onChangeTab={setActiveRightTab} problemMeta={problemMeta} onAction={handleAction} />
+                <AssessmentDetails activeTab={activeRightTab} onChangeTab={setActiveRightTab} problemMeta={problemMeta} onAction={handleAction} submitted={submitted} />
                 {/* <KeyboardShortcuts /> */}
               </div>
             </div>

@@ -61,10 +61,10 @@ export default function ConsolePanel({ activeTab, outputLines, testLines, submis
         {activeTab === 'tests' && renderTestSummary()}
         {activeTab === 'output' && (outputLines.length > 0 ? outputLines.map((line, index) => (
           <p key={`${line}-${index}`} className="whitespace-pre-wrap border-b border-slate-800 py-2 text-slate-200">{line}</p>
-        )) : <p className="text-slate-400 py-2">Click Build & Run Tests or Run Tests to see output...</p>)}
+        )) : <p className="text-slate-400 py-2">Click Build & Run Tests to see output...</p>)}
         {activeTab === 'tests' && (testLines.length > 0 ? testLines.map((line, index) => (
           <p key={`${line}-${index}`} className="whitespace-pre-wrap border-b border-slate-800 py-2 text-slate-200">{line}</p>
-        )) : <p className="text-slate-400 py-2">Click Build & Run Tests or Run Tests to run test cases...</p>)}
+        )) : <p className="text-slate-400 py-2">Click Build & Run Tests to run test cases...</p>)}
         {activeTab === 'submission' && (submissionLines.length > 0 ? submissionLines.map((line, index) => (
           <p key={`${line}-${index}`} className="whitespace-pre-wrap border-b border-slate-800 py-2 text-slate-200">{line}</p>
         )) : <p className="text-slate-400 py-2">Use Build & Run Tests to unlock solution access...</p>)}

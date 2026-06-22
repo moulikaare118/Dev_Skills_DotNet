@@ -190,6 +190,24 @@ function runCommand(command, args, cwd) {
   });
 }
 
+async function runDotnetCommand(cwd, mode) {
+  const command = mode === 'test'
+    ? ['test', 'HON.Academy.sln', '-v', 'normal', '--logger', 'console;verbosity=normal']
+    : ['build', 'HON.Academy.sln'];
+  const result = await runCommand('dotnet', command, cwd);
+  return { command, result };
+}
+
+function formatDotnetResult({ command, result }, mode) {
+  const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
+
+  return output || [
+    `dotnet ${command.join(' ')}`,
+    result.code === 0 ? `${mode === 'test' ? 'Test run completed successfully.' : 'Build completed successfully.'}` : `${mode === 'test' ? 'Test run failed.' : 'Build failed.'}`,
+    'No console output was produced by dotnet.'
+  ].join('\n');
+}
+
 async function createProjectWorkspace(files = [], templateRoot = starterProjectRoot) {
   await ensureProjectRoot(templateRoot, 'project');
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'devskills-dotnet-'));
