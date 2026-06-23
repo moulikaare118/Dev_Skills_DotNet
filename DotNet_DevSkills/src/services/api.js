@@ -15,9 +15,21 @@ async function requestJson(path, payload) {
   return response.json();
 }
 
-export async function loadWorkspace(mode = 'starter') {
+export async function loadWorkspace(assessmentKey = 'main-exam', mode = 'starter') {
   const endpoint = mode === 'solution' ? '/workspace/solution' : '/workspace';
-  const response = await fetch(`${API_BASE}${endpoint}`);
+  const searchParams = new URLSearchParams();
+
+  if (assessmentKey) {
+    searchParams.set('assessment', assessmentKey);
+  }
+
+  if (mode === 'solution') {
+    searchParams.set('mode', 'solution');
+  }
+
+  const queryString = searchParams.toString();
+  const requestPath = queryString ? `${endpoint}?${queryString}` : endpoint;
+  const response = await fetch(`${API_BASE}${requestPath}`);
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(errorText || 'Failed to load workspace');
@@ -36,24 +48,24 @@ export async function loadAssessmentMeta() {
   return response.json();
 }
 
-export async function loadSolutionWorkspace() {
-  return loadWorkspace('solution');
+export async function loadSolutionWorkspace(assessmentKey = 'main-exam') {
+  return loadWorkspace(assessmentKey, 'solution');
 }
 
-export async function runCode(files) {
-  return requestJson('/project/run', { files });
+export async function runCode(files, assessmentKey = 'main-exam') {
+  return requestJson('/project/run', { files, assessmentKey });
 }
 
-export async function runTests(files) {
-  return requestJson('/project/tests', { files });
+export async function runTests(files, assessmentKey = 'main-exam') {
+  return requestJson('/project/tests', { files, assessmentKey });
 }
 
-export async function buildAndRunTests(files) {
-  return requestJson('/project/build-and-test', { files });
+export async function buildAndRunTests(files, assessmentKey = 'main-exam') {
+  return requestJson('/project/build-and-test', { files, assessmentKey });
 }
 
-export async function submitSolution(files) {
-  return requestJson('/project/submit', { files });
+export async function submitSolution(files, assessmentKey = 'main-exam') {
+  return requestJson('/project/submit', { files, assessmentKey });
 }
 
 export async function buildUploadedZip(file) {

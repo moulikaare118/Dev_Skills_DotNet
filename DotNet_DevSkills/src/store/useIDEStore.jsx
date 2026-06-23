@@ -38,8 +38,23 @@ const defaultState = {
   workspaceLoaded: false,
   workspaceLoading: false,
   workspaceMode: 'starter',
+  workspaceAssessmentKey: 'main-exam',
   workspaceError: ''
 };
+
+function normalizeWorkspaceRequest(workspaceRequest = 'starter', maybeMode) {
+  if (typeof workspaceRequest === 'string') {
+    return {
+      assessmentKey: maybeMode ? workspaceRequest : null,
+      mode: maybeMode || workspaceRequest
+    };
+  }
+
+  return {
+    assessmentKey: workspaceRequest?.assessmentKey || null,
+    mode: workspaceRequest?.mode || 'starter'
+  };
+}
 
 const useIDEStore = create((set, get) => ({
   ...defaultState,
@@ -58,15 +73,18 @@ const useIDEStore = create((set, get) => ({
       files: state.files.map((file) => (file.id === id ? { ...file, content } : file)),
       unsavedChanges: true
     })),
-  loadWorkspace: async (mode = 'starter') => {
+  loadWorkspace: async (workspaceRequest = 'starter', maybeMode) => {
     if (get().workspaceLoading) {
       return;
     }
 
+    const { assessmentKey: requestedAssessmentKey, mode } = normalizeWorkspaceRequest(workspaceRequest, maybeMode);
+    const assessmentKey = requestedAssessmentKey || get().workspaceAssessmentKey || 'main-exam';
+
     set({ workspaceLoading: true, workspaceError: '' });
 
     try {
-      const payload = mode === 'solution' ? await loadSolutionWorkspace() : await loadWorkspace();
+      const payload = mode === 'solution' ? await loadSolutionWorkspace(assessmentKey) : await loadWorkspace(assessmentKey, mode);
       const files = (payload.files || []).map((file) => ({
         ...file,
         readOnly: file.readOnly ?? false
@@ -80,6 +98,7 @@ const useIDEStore = create((set, get) => ({
         workspaceLoaded: true,
         workspaceLoading: false,
         workspaceMode: mode,
+        workspaceAssessmentKey: assessmentKey,
         workspaceError: '',
         unsavedChanges: false,
         testSummary: { total: 0, passed: 0, failed: 0, skipped: 0, duration: null },
@@ -92,6 +111,7 @@ const useIDEStore = create((set, get) => ({
         activeFileId: null,
         workspaceLoading: false,
         workspaceLoaded: false,
+        workspaceAssessmentKey: assessmentKey,
         workspaceError: `Failed to load workspace: ${error?.message || 'Backend unavailable'}`,
         unsavedChanges: false,
         testSummary: { total: 0, passed: 0, failed: 0, skipped: 0, duration: null },
@@ -104,10 +124,12 @@ const useIDEStore = create((set, get) => ({
       return;
     }
 
+    const assessmentKey = get().workspaceAssessmentKey || 'main-exam';
+
     set({ workspaceLoading: true, workspaceError: '' });
 
     try {
-      const payload = await loadWorkspace();
+      const payload = await loadWorkspace(assessmentKey, 'starter');
       const files = (payload.files || []).map((file) => ({
         ...file,
         readOnly: file.readOnly ?? false
@@ -121,6 +143,7 @@ const useIDEStore = create((set, get) => ({
         workspaceLoaded: true,
         workspaceLoading: false,
         workspaceMode: 'starter',
+        workspaceAssessmentKey: assessmentKey,
         unsavedChanges: false,
         activeOutputTab: 'output',
         activeRightTab: 'problem',
@@ -138,6 +161,7 @@ const useIDEStore = create((set, get) => ({
         activeFileId: null,
         workspaceLoading: false,
         workspaceLoaded: false,
+        workspaceAssessmentKey: assessmentKey,
         workspaceError: `Reset failed: ${error?.message || 'Backend unavailable'}`,
         unsavedChanges: false,
         activeOutputTab: 'output',
@@ -151,7 +175,7 @@ const useIDEStore = create((set, get) => ({
     }
   },
   refreshFiles: async () => {
-    await get().loadWorkspace(get().workspaceMode || 'starter');
+    await get().loadWorkspace({ assessmentKey: get().workspaceAssessmentKey || 'main-exam', mode: get().workspaceMode || 'starter' });
     set({ outputLines: ['File tree refreshed.'], unsavedChanges: false });
   }
 }));

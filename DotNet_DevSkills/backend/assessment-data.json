@@ -36,6 +36,26 @@
       }
     ]
   },
+  "codeEditor": {
+    "title": "Assessment Type",
+    "defaultAssessmentKey": "main-exam",
+    "assessments": [
+      {
+        "key": "main-exam",
+        "label": "Main Exam Code",
+        "starterRoot": "MainExam_Todos",
+        "solutionRoot": "MainExam",
+        "solutionFile": "HON.Academy.sln"
+      },
+      {
+        "key": "hon-orders",
+        "label": "HON Orders Code",
+        "starterRoot": "HON.Orders",
+        "solutionRoot": "HON.Orders",
+        "solutionFile": "HON.Orders.sln"
+      }
+    ]
+  },
   "assessment": {
     "title": "HON Orders Training Assessment",
     "description": "Build a mini ASP.NET Core MVC order-management application for the HON Orders training program. Focus on MVC controllers, views, model binding, validation, EF Core data access, and xUnit testing. Do not build or consume Web APIs for this assessment.",

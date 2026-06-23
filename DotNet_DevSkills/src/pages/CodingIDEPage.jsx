@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useCallback, useState, useRef } from 'react';
+import { useEffect, useMemo, useCallback, useState } from 'react';
 import Editor from '@monaco-editor/react';
 import ThemeToggle from '../components/ThemeToggle';
 import FileExplorer from '../components/FileExplorer';
@@ -6,7 +6,7 @@ import AssessmentDetails from '../components/AssessmentDetails';
 import ConsolePanel from '../components/ConsolePanel';
 import Timer from '../components/Timer';
 import useIDEStore from '../store/useIDEStore';
-import { buildAndRunTests, submitSolution } from '../services/api';
+import { buildAndRunTests, loadAssessmentMeta, submitSolution } from '../services/api';
 
 const problemMeta = {
   title: 'MainExam: E-Learning Platform',
@@ -28,6 +28,26 @@ const problemMeta = {
     'Project structure includes: Models (Student, Course, Assignment, Result), Services (CourseServices), Controllers (CourseController), DTOs (StudentPerformanceDTO, CourseDTO)'
   ]
 };
+
+const fallbackAssessmentOptions = [
+  { key: 'main-exam', label: 'Main Exam Code' },
+  { key: 'hon-orders', label: 'HON Orders Code' }
+];
+
+function getAssessmentOptions(assessmentMeta) {
+  const sourceOptions = assessmentMeta?.codeEditor?.assessments;
+
+  if (Array.isArray(sourceOptions) && sourceOptions.length > 0) {
+    return sourceOptions
+      .map((assessment) => ({
+        key: String(assessment.key || '').trim().toLowerCase(),
+        label: assessment.label || assessment.key
+      }))
+      .filter((assessment) => assessment.key);
+  }
+
+  return fallbackAssessmentOptions;
+}
 
 const DEFAULT_OUTPUT_PLACEHOLDER = 'No output returned from dotnet.';
 
@@ -115,6 +135,8 @@ function createSubmissionLines(success, results) {
 }
 
 export default function CodingIDEPage({ theme, onToggleTheme }) {
+  const [assessmentMeta, setAssessmentMeta] = useState(null);
+  const [selectedAssessmentKey, setSelectedAssessmentKey] = useState('');
   const activeFileId = useIDEStore((state) => state.activeFileId);
   const files = useIDEStore((state) => state.files);
   const activeOutputTab = useIDEStore((state) => state.activeOutputTab);
@@ -123,17 +145,14 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
   const testLines = useIDEStore((state) => state.testLines);
   const submissionLines = useIDEStore((state) => state.submissionLines);
   const unsavedChanges = useIDEStore((state) => state.unsavedChanges);
-  const workspaceLoaded = useIDEStore((state) => state.workspaceLoaded);
   const workspaceLoading = useIDEStore((state) => state.workspaceLoading);
   const workspaceError = useIDEStore((state) => state.workspaceError);
-  const workspaceMode = useIDEStore((state) => state.workspaceMode);
   const testResults = useIDEStore((state) => state.testSummary);
   const fullscreen = useIDEStore((state) => state.fullscreen);
   const [timeExpired, setTimeExpired] = useState(false);
   const [solutionUnlocked, setSolutionUnlocked] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [timerResetSignal, setTimerResetSignal] = useState(0);
-  const workspaceSyncStarted = useRef(false);
   const setActiveFile = useIDEStore((state) => state.setActiveFile);
   const updateFileContent = useIDEStore((state) => state.updateFileContent);
   const setActiveOutputTab = useIDEStore((state) => state.setActiveOutputTab);
@@ -149,7 +168,26 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
   const toggleFullscreen = useIDEStore((state) => state.toggleFullscreen);
 
   const activeFile = useMemo(() => files.find((file) => file.id === activeFileId), [files, activeFileId]);
+  const assessmentOptions = useMemo(() => getAssessmentOptions(assessmentMeta), [assessmentMeta]);
+  const activeAssessment = useMemo(
+    () => assessmentOptions.find((assessment) => assessment.key === selectedAssessmentKey) || null,
+    [assessmentOptions, selectedAssessmentKey]
+  );
   const editorTheme = theme === 'dark' ? 'vs-dark' : 'vs-light';
+
+  useEffect(() => {
+    loadAssessmentMeta().then(setAssessmentMeta).catch(() => setAssessmentMeta(null));
+  }, []);
+
+  useEffect(() => {
+    if (!assessmentOptions.length) {
+      return;
+    }
+
+    if (selectedAssessmentKey && !assessmentOptions.some((assessment) => assessment.key === selectedAssessmentKey)) {
+      setSelectedAssessmentKey('');
+    }
+  }, [assessmentMeta, assessmentOptions, selectedAssessmentKey]);
 
   const formatConsoleOutput = useCallback((response, mode) => {
     const rawOutput = typeof response?.output === 'string' ? response.output.trim() : '';
@@ -174,20 +212,27 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
   }, []);
 
   useEffect(() => {
-    if (!workspaceSyncStarted.current) {
-      workspaceSyncStarted.current = true;
-      loadWorkspace('starter');
+    if (!selectedAssessmentKey) {
+      return;
     }
-  }, [loadWorkspace]);
+
+    loadWorkspace({ assessmentKey: selectedAssessmentKey, mode: 'starter' });
+  }, [loadWorkspace, selectedAssessmentKey]);
 
   const handleBuildAndRunTests = useCallback(async () => {
+    if (!selectedAssessmentKey) {
+      setOutputLines(['Select an assessment type to load code before running tests.']);
+      setTestLines(['Select an assessment type to load code before running tests.']);
+      return;
+    }
+
     setActiveOutputTab('output');
     setOutputLines(['Building project and running tests...']);
     setTestLines(['Building project and running tests...']);
     setTestSummary({ total: 0, passed: 0, failed: 0, skipped: 0, duration: null });
 
     try {
-      const response = await buildAndRunTests(files);
+      const response = await buildAndRunTests(files, selectedAssessmentKey);
       const buildResult = response?.buildResult || response;
       const testResult = response?.testResult || null;
 
@@ -212,15 +257,21 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
       setTestLines(['Build and test execution failed.']);
       setTestSummary({ total: 0, passed: 0, failed: 0, skipped: 0, duration: null });
     }
-  }, [files, formatConsoleOutput, setActiveOutputTab, setOutputLines, setTestLines, setTestSummary]);
+  }, [files, formatConsoleOutput, selectedAssessmentKey, setActiveOutputTab, setOutputLines, setTestLines, setTestSummary]);
 
   const handleSubmit = useCallback(async () => {
+    if (!selectedAssessmentKey) {
+      setActiveOutputTab('submission');
+      setSubmissionLines(['Select an assessment type to load code before submitting.']);
+      return;
+    }
+
     setActiveOutputTab('submission');
     setSubmissionLines(['Submitting final solution...']);
     setSubmitted(true);
 
     try {
-      const response = await submitSolution(files);
+      const response = await submitSolution(files, selectedAssessmentKey);
       setSubmissionLines([
         `Status: ${response.status || 'Submitted'}`,
         `Passed: ${response.passed || 0}`,
@@ -234,23 +285,29 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
     } catch (error) {
       setSubmissionLines([`Error: ${error.message || error}`]);
     }
-  }, [files, setActiveOutputTab, setSubmissionLines]);
+  }, [files, selectedAssessmentKey, setActiveOutputTab, setSubmissionLines]);
 
   const handleGetSolution = useCallback(async () => {
+    if (!selectedAssessmentKey) {
+      setActiveOutputTab('submission');
+      setSubmissionLines(['Select an assessment type to load code before requesting a solution.']);
+      return;
+    }
+
     if (!timeExpired && !solutionUnlocked && !submitted) return;
 
     setActiveOutputTab('submission');
     setSubmissionLines(['Loading solution workspace...']);
 
     try {
-      await loadWorkspace('solution');
+      await loadWorkspace({ assessmentKey: selectedAssessmentKey, mode: 'solution' });
       setSubmissionLines(['Solution workspace loaded successfully.']);
       setOutputLines(['Ready to build and run tests against the solution workspace.']);
       setTestLines(['Test runner is ready.']);
     } catch (error) {
       setSubmissionLines([`Error: ${error.message || 'Unable to load solution workspace'}`]);
     }
-  }, [loadWorkspace, setActiveOutputTab, setSubmissionLines, solutionUnlocked, submitted, timeExpired]);
+  }, [loadWorkspace, selectedAssessmentKey, setActiveOutputTab, setSubmissionLines, solutionUnlocked, submitted, timeExpired]);
 
   const handleAction = useCallback(async (action) => {
     if (action === 'hints') {
@@ -379,23 +436,54 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
                   <div className="flex flex-wrap items-center gap-3">
                     <h2 className="mt-1 text-xl font-semibold text-slate-900">Coding Workspace</h2>
                     <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600">
-                      {workspaceMode === 'solution' ? 'Solution Workspace' : 'Starter Workspace'}
+                      {activeAssessment?.label || 'No assessment selected'}
                     </span>
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="min-w-[240px] flex-1 sm:flex-none sm:order-first">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Assessment Type</span>
+                    <select
+                      value={selectedAssessmentKey}
+                      onChange={(event) => setSelectedAssessmentKey(event.target.value)}
+                      className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-sky-400 focus:bg-white"
+                    >
+                      <option value="">Select an assessment</option>
+                      {assessmentOptions.map((assessment) => (
+                        <option key={assessment.key} value={assessment.key}>
+                          {assessment.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
                   <button onClick={handleBuildAndRunTests} className="inline-flex items-center gap-2 rounded-3xl bg-[#84BD00] px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-emerald-500">Build & Run Tests</button>
                   <button onClick={handleSubmit} className="inline-flex items-center gap-2 rounded-3xl bg-sky-500 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-sky-400">Submit</button>
                   <button onClick={handleGetSolution} disabled={!timeExpired && !solutionUnlocked && !submitted} className="inline-flex items-center gap-2 rounded-3xl bg-slate-800 px-3 py-2 text-xs font-semibold text-white transition disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 hover:bg-slate-700">Get Solution</button>
                   <button onClick={resetEditor} disabled={submitted} className="inline-flex items-center gap-2 rounded-3xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400">Reset</button>
+                  </div>
                 </div>
               </div>
               <div className="h-[calc(100vh-340px)] overflow-hidden rounded-3xl bg-slate-950">
                 {workspaceLoading ? (
-                  <div className="flex h-full items-center justify-center text-sm text-slate-300">Loading workspace from backend...</div>
+                  <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-300">Loading {activeAssessment?.label || 'assessment'} workspace from backend...</div>
+                ) : !selectedAssessmentKey ? (
+                  <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-300">
+                    <div className="max-w-lg space-y-3 rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-lg shadow-black/20">
+                      <p className="text-base font-semibold text-slate-100">No code selected yet.</p>
+                      <p className="text-sm text-slate-400">Choose an assessment type from the dropdown to load its source code.</p>
+                    </div>
+                  </div>
+                ) : workspaceError || !activeFile ? (
+                  <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-300">
+                    <div className="max-w-lg space-y-3 rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-lg shadow-black/20">
+                      <p className="text-base font-semibold text-slate-100">{workspaceError || `No code is available for ${activeAssessment?.label || 'the selected assessment'}.`}</p>
+                      <p className="text-sm text-slate-400">Select another assessment type or verify that the configured source root exists.</p>
+                    </div>
+                  </div>
                 ) : (
                   <Editor
-                    key={activeFile?.id || 'editor'}
+                    key={`${selectedAssessmentKey}:${activeFile?.id || 'editor'}`}
                     height="100%"
                     defaultLanguage="csharp"
                     value={activeFile?.content || ''}
