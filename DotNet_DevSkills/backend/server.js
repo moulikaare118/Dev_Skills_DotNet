@@ -1515,6 +1515,31 @@ async function findSolutionFile(rootDir) {
   return null;
 }
 
+async function findTestProject(rootDir) {
+  const entries = await fs.readdir(rootDir, { withFileTypes: true });
+
+  // First pass: look for .Tests.csproj files at current level
+  for (const entry of entries) {
+    if (entry.isFile() && entry.name.endsWith('.Tests.csproj')) {
+      return path.join(rootDir, entry.name);
+    }
+  }
+
+  // Second pass: recurse into directories
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+
+    const nested = await findTestProject(path.join(rootDir, entry.name)).catch(() => null);
+    if (nested) {
+      return nested;
+    }
+  }
+
+  return null;
+}
+
 function runCommand(command, args, cwd) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { cwd, shell: false });
@@ -1832,8 +1857,14 @@ async function evaluateZip(zipBase64, mode) {
   try {
     let command;
     if (mode === 'test') {
-      // Run tests on the specific test project
-      command = ['test', 'HON.Academy.XunitTests/HON.Academy.XunitTests.csproj', '--verbosity', 'normal'];
+      // Dynamically find the test project
+      const testProjectPath = await findTestProject(solutionRoot);
+      if (!testProjectPath) {
+        throw new Error('No test project (.Tests.csproj) found in the uploaded solution.');
+      }
+      // Make path relative to solutionRoot for dotnet CLI
+      const relativeTestPath = path.relative(solutionRoot, testProjectPath);
+      command = ['test', relativeTestPath, '--verbosity', 'normal'];
     } else {
       command = ['build'];
     }
