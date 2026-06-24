@@ -43,15 +43,15 @@
       {
         "key": "main-exam",
         "label": "Main Exam Code",
-        "starterRoot": "MainCode",
-        "solutionRoot": "MainCode-Sol",
+        "starterRoot": "dist/MainCode",
+        "solutionRoot": "dist/MainCode-Sol",
         "solutionFile": "HON.Academy.sln"
       },
       {
         "key": "hon-orders",
         "label": "HON Orders Code",
-        "starterRoot": "testToday-main",
-        "solutionRoot": "testToday-main - Sol",
+        "starterRoot": "dist/testToday-main",
+        "solutionRoot": "dist/testToday-main - Sol",
         "solutionFile": "HONOrders.sln"
       }
     ]

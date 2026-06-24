@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 
 const backendDir = path.dirname(fileURLToPath(import.meta.url));
 const frontendRoot = path.resolve(backendDir, '..');
-const workspaceRoot = path.resolve(frontendRoot, '..');
+const appRoot = frontendRoot;  // DotNet_DevSkills is the app root
 const assessmentDataPath = path.join(backendDir, 'assessment-data.json');
 const host = process.env.HOST || '127.0.0.1';
 const port = Number(process.env.PORT || 8787);
@@ -16,16 +16,16 @@ const fallbackCodeEditorAssessments = [
   {
     key: 'main-exam',
     label: 'Main Exam Code',
-    starterRoot: 'MainCode',
-    solutionRoot: 'MainCode-Sol',
+    starterRoot: 'dist/MainCode',
+    solutionRoot: 'dist/MainCode-Sol',
     solutionFile: 'HON.Academy.sln'
   },
   {
     key: 'hon-orders',
     label: 'HON Orders Code',
-    starterRoot: 'testToday-main',
-    solutionRoot: 'testToday-main - Sol',
-    solutionFile: 'HON.Orders.sln'
+    starterRoot: 'dist/testToday-main',
+    solutionRoot: 'dist/testToday-main-Sol',
+    solutionFile: 'HONOrders.sln'
   }
 ];
 
@@ -1620,8 +1620,8 @@ async function getAssessmentExecutionConfig(assessmentKey, workspaceMode = 'star
   
   const solutionFile = resolveAssessmentSolutionFile(assessmentConfig)
     || assessmentConfig.solutionFile
-    || await findSolutionFile(path.join(workspaceRoot, starterRootName)).catch(() => null)
-    || await findSolutionFile(path.join(workspaceRoot, solutionRootName)).catch(() => null)
+    || await findSolutionFile(path.join(appRoot, starterRootName)).catch(() => null)
+    || await findSolutionFile(path.join(appRoot, solutionRootName)).catch(() => null)
     || '';
 
   if (!starterRootName || !solutionRootName || !solutionFile) {
@@ -1630,9 +1630,9 @@ async function getAssessmentExecutionConfig(assessmentKey, workspaceMode = 'star
 
   return {
     assessmentConfig,
-    starterRoot: path.join(workspaceRoot, starterRootName),
-    solutionRoot: path.join(workspaceRoot, solutionRootName),
-    projectRoot: path.join(workspaceRoot, selectedRootName),
+    starterRoot: path.join(appRoot, starterRootName),
+    solutionRoot: path.join(appRoot, solutionRootName),
+    projectRoot: path.join(appRoot, selectedRootName),
     solutionFile
   };
 }
@@ -1719,7 +1719,7 @@ async function loadWorkspaceFiles(assessmentKey, mode = 'starter') {
     throw new Error('No code is configured for the selected assessment.');
   }
 
-  const projectRoot = path.join(workspaceRoot, rootName);
+  const projectRoot = path.join(appRoot, rootName);
   await ensureProjectRoot(projectRoot, assessmentConfig.label || 'selected assessment');
 
   const files = await walkTextFiles(projectRoot);
