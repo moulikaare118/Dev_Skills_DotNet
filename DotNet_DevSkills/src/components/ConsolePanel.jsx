@@ -42,7 +42,7 @@ export default function ConsolePanel({ activeTab, outputLines, testLines, submis
   };
 
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-lg shadow-slate-200/20">
+    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-lg shadow-slate-200/20 min-w-0">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm uppercase tracking-[0.2em] text-sky-500">Console</p>
@@ -65,13 +65,13 @@ export default function ConsolePanel({ activeTab, outputLines, testLines, submis
       <div className="mt-5 min-h-[260px] overflow-auto rounded-3xl bg-slate-950 p-4 text-sm text-slate-100 shadow-inner shadow-slate-900/10">
         {activeTab === 'tests' && renderTestSummary()}
         {activeTab === 'output' && (outputLines.length > 0 ? outputLines.map((line, index) => (
-          <p key={`${line}-${index}`} className="whitespace-pre-wrap border-b border-slate-800 py-2 text-slate-200">{line}</p>
+          <p key={`${line}-${index}`} className="break-words whitespace-pre-wrap border-b border-slate-800 py-2 text-slate-200">{line}</p>
         )) : <p className="text-slate-400 py-2">Click Build & Run Tests to see output...</p>)}
         {activeTab === 'tests' && (testLines.length > 0 ? testLines.map((line, index) => (
-          <p key={`${line}-${index}`} className="whitespace-pre-wrap border-b border-slate-800 py-2 text-slate-200">{line}</p>
+          <p key={`${line}-${index}`} className="break-words whitespace-pre-wrap border-b border-slate-800 py-2 text-slate-200">{line}</p>
         )) : <p className="text-slate-400 py-2">Click Build & Run Tests to run test cases...</p>)}
         {activeTab === 'submission' && (submissionLines.length > 0 ? submissionLines.map((line, index) => (
-          <p key={`${line}-${index}`} className="whitespace-pre-wrap border-b border-slate-800 py-2 text-slate-200">{line}</p>
+          <p key={`${line}-${index}`} className="break-words whitespace-pre-wrap border-b border-slate-800 py-2 text-slate-200">{line}</p>
         )) : <p className="text-slate-400 py-2">Use Build & Run Tests to unlock solution access...</p>)}
       </div>
     </div>

@@ -93,7 +93,7 @@ export default function AssessmentPage({ theme, onToggleTheme }) {
         </div>
       </header>
 
-      <div className="grid gap-8 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
         <aside className="space-y-6">
           <section className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Instructions</h2>
@@ -116,7 +116,7 @@ export default function AssessmentPage({ theme, onToggleTheme }) {
           <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
             <h2 className="text-2xl font-semibold text-slate-900">{assessmentMeta?.assessment?.title || 'Assessment'}</h2>
             <p className="mt-4 text-slate-600">{assessmentMeta?.assessment?.description || 'Loading assessment details...'}</p>
-            <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+            <div className="grid gap-6 sm:grid-cols-1 xl:grid-cols-[1fr_1fr]">
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
                 <h3 className="font-semibold text-slate-900">Requirements</h3>
                 <ul className="mt-4 space-y-3 text-slate-600">
@@ -149,7 +149,7 @@ export default function AssessmentPage({ theme, onToggleTheme }) {
                 <p className="mt-2 text-sm text-slate-600">Download the starter package and use the TODO comments to complete the assessment.</p>
               </div>
               <a
-                href="/MainExam_Todos.zip"
+                href="/MainCode.zip"
                 download
                 className="inline-flex items-center justify-center rounded-3xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
               >

@@ -43,8 +43,8 @@
       {
         "key": "main-exam",
         "label": "Main Exam Code",
-        "starterRoot": "MainExam_Todos",
-        "solutionRoot": "MainExam",
+        "starterRoot": "MainCode",
+        "solutionRoot": "MainCode-Sol",
         "solutionFile": "HON.Academy.sln"
       },
       {

@@ -16,8 +16,8 @@ const fallbackCodeEditorAssessments = [
   {
     key: 'main-exam',
     label: 'Main Exam Code',
-    starterRoot: 'MainExam_Todos',
-    solutionRoot: 'MainExam',
+    starterRoot: 'MainCode',
+    solutionRoot: 'MainCode-Sol',
     solutionFile: 'HON.Academy.sln'
   },
   {
@@ -1544,8 +1544,24 @@ async function runDotnetCommand(cwd, mode) {
   return { command, result };
 }
 
+function stripDotnetWarnings(output) {
+  return output
+    .split(/\r?\n/)
+    .filter((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return false;
+      return !/\bwarning\b/i.test(trimmed) && !/NU\d{4}/i.test(trimmed);
+    })
+    .join('\n');
+}
+
 function formatDotnetResult(result, command, mode) {
-  const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
+  let output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
+
+  if (result.code === 0) {
+    const filteredOutput = stripDotnetWarnings(output);
+    output = filteredOutput.trim();
+  }
 
   return output || [
     `dotnet ${command.join(' ')}`,

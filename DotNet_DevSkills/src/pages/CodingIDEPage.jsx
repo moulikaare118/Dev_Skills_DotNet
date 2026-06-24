@@ -9,7 +9,7 @@ import useIDEStore from '../store/useIDEStore';
 import { buildAndRunTests, loadAssessmentMeta, submitSolution } from '../services/api';
 
 const problemMeta = {
-  title: 'MainExam: E-Learning Platform',
+  title: 'MainCode-Sol: E-Learning Platform',
   difficulty: 'Medium',
   timeLimit: '120 minutes',
   language: 'C#',
@@ -188,6 +188,7 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
   const [solutionUnlocked, setSolutionUnlocked] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [timerResetSignal, setTimerResetSignal] = useState(0);
+  const [timerStarted, setTimerStarted] = useState(false);
   const setActiveFile = useIDEStore((state) => state.setActiveFile);
   const updateFileContent = useIDEStore((state) => state.updateFileContent);
   const setActiveOutputTab = useIDEStore((state) => state.setActiveOutputTab);
@@ -209,6 +210,28 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
     [assessmentOptions, selectedAssessmentKey]
   );
   const editorTheme = theme === 'dark' ? 'vs-dark' : 'vs-light';
+
+  const activeProblemMeta = useMemo(() => {
+    const assessment = assessmentMeta?.assessment;
+    if (!assessment) {
+      return problemMeta;
+    }
+
+    return {
+      title: assessment.title || problemMeta.title,
+      difficulty: assessment.difficulty || problemMeta.difficulty,
+      timeLimit: assessment.timeLimit || problemMeta.timeLimit,
+      language: assessment.language || problemMeta.language,
+      description: assessment.description || problemMeta.description,
+      inputFormat: assessment.inputFormat || problemMeta.inputFormat,
+      outputFormat: assessment.outputFormat || problemMeta.outputFormat,
+      task: assessment.task || problemMeta.task,
+      solution: assessment.solution || problemMeta.solution,
+      examples: assessment.examples || problemMeta.examples,
+      instructions: assessment.requirements || problemMeta.instructions,
+      tasks: assessment.tasks || problemMeta.tasks
+    };
+  }, [assessmentMeta, selectedAssessmentKey]);
 
   useEffect(() => {
     loadAssessmentMeta().then(setAssessmentMeta).catch(() => setAssessmentMeta(null));
@@ -251,6 +274,12 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
       return;
     }
 
+    setTimeExpired(false);
+    setTimerResetSignal((value) => value + 1);
+    setTimerStarted(true);
+    setSolutionUnlocked(false);
+    setSubmitted(false);
+
     loadWorkspace({ assessmentKey: selectedAssessmentKey, mode: 'starter' });
   }, [loadWorkspace, selectedAssessmentKey]);
 
@@ -288,6 +317,11 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
         if (parsedResults.failed > 0) {
           setActiveOutputTab('tests');
         }
+
+        // If tests passed (at least one passed and zero failed), unlock solution access
+        if (parsedResults.passed > 0 && parsedResults.failed === 0) {
+          setSolutionUnlocked(true);
+        }
       } else {
         setTestLines(['Tests were not run because the build failed.']);
         setTestSummary({ total: 0, passed: 0, failed: 0, skipped: 0, duration: null });
@@ -308,19 +342,48 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
 
     setActiveOutputTab('submission');
     setSubmissionLines(['Submitting final solution...']);
-    setSubmitted(true);
 
     try {
       const response = await submitSolution(files, selectedAssessmentKey, workspaceMode);
-      setSubmissionLines([
-        `Status: ${response.status || 'Submitted'}`,
-        `Passed: ${response.passed || 0}`,
-        `Failed: ${response.failed || 0}`,
-        `Message: ${response.message || 'Solution submitted successfully.'}`
-      ]);
 
-      if (response.success) {
+      // Prefer structured test summary returned by the backend
+      const testSummaryFromResponse = response?.testSummary || response?.test_summary || null;
+
+      if (testSummaryFromResponse) {
+        const passed = Number(testSummaryFromResponse.passed || testSummaryFromResponse.succeeded || testSummaryFromResponse.passing || 0);
+        const failed = Number(testSummaryFromResponse.failed || testSummaryFromResponse.failing || 0);
+
+        setSubmissionLines(createSubmissionLines(Boolean(response.success), { passed, failed, failures: testSummaryFromResponse.failures || [] }));
+        // Enable submission state and solution access even when tests failed
+        setSubmitted(true);
         setSolutionUnlocked(true);
+        setTimerStarted(false);
+      } else {
+        // Fallback display when backend returns a flatter response
+        setSubmissionLines([
+          `Status: ${response.status || 'Submitted'}`,
+          `Passed: ${response.passed || 0}`,
+          `Failed: ${response.failed || 0}`,
+          `Message: ${response.message || 'Solution submitted.'}`
+        ]);
+
+        // Robustly detect a successful submission even if `success` flag is missing
+        const submissionSucceeded = Boolean(response.success)
+          || (response.status && /submitted|ok|success/i.test(String(response.status)))
+          || (response.message && /submitted|ok|success/i.test(String(response.message)))
+          || (((response.passed || 0) + (response.failed || 0)) > 0);
+
+        if (submissionSucceeded) {
+          setSubmitted(true);
+          setSolutionUnlocked(true);
+          setTimerStarted(false);
+        } else {
+          // Even when the backend marks the submission as blocked, consider the submission completed
+          // and enable solution retrieval per user request.
+          setSubmitted(true);
+          setSolutionUnlocked(true);
+          setTimerStarted(false);
+        }
       }
     } catch (error) {
       setSubmissionLines([`Error: ${error.message || error}`]);
@@ -334,7 +397,7 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
       return;
     }
 
-    if (!timeExpired && !solutionUnlocked && !submitted) return;
+    if (!submitted && !solutionUnlocked) return;
 
     setActiveOutputTab('submission');
     setSubmissionLines(['Loading solution workspace...']);
@@ -356,7 +419,6 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
     }
 
     if (action === 'finish') {
-      handleFinishTest();
       return;
     }
 
@@ -370,14 +432,11 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
       setOutputLines(['Resetting editor to live workspace...']);
       setSubmissionLines([]);
       setTestLines(['Test runner is ready.']);
-      setSubmitting(false);
-      setTestFinished(false);
       setTimeExpired(false);
       setSolutionUnlocked(false);
       setTimerResetSignal((value) => value + 1);
       window.localStorage.removeItem('devskills-assessment-timer');
-
-      setSubmitted(false);
+      setTimerStarted(true);
 
       // Reload starter workspace and reset IDE state
       await resetEditor();
@@ -388,10 +447,7 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
       setSubmissionLines([]);
       setTestLines(['Test runner is ready.']);
       setTestSummary({ total: 0, passed: 0, failed: 0, skipped: 0, duration: null });
-      setTestCases([]);
       setSubmitted(false);
-      setTestFinished(false);
-      setSubmitting(false);
     }
   }, [resetEditor, setActiveOutputTab, setActiveRightTab, setSubmissionLines, setOutputLines, setTestLines, submitted]);
 
@@ -426,7 +482,7 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
       <div className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 px-4 py-4 shadow-sm backdrop-blur-md sm:px-6">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="rounded-3xl bg-[#84BD00] px-4 py-2 text-sm font-semibold text-slate-950">MainExam</div>
+            <div className="rounded-3xl bg-[#84BD00] px-4 py-2 text-sm font-semibold text-slate-950">MainCode-Sol</div>
             <div>
               <p className="text-sm font-semibold text-slate-900">E-Learning Assessment IDE</p>
               <p className="text-xs text-slate-500">.NET Core / C# | Course Management Platform</p>
@@ -445,9 +501,9 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
       </div>
 
       <div className="mx-auto mt-6 max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
-        <div className="grid min-h-[calc(100vh-160px)] gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <div className="grid min-h-[calc(100vh-160px)] gap-5 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)] min-w-0">
           <aside className="flex min-w-0 flex-col gap-5">
-            <div className="w-full max-w-[280px]">
+            <div className="w-full max-w-[280px] lg:max-w-none">
               <FileExplorer
                 files={files}
                 activeFileId={activeFileId}
@@ -486,7 +542,8 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
                     <select
                       value={selectedAssessmentKey}
                       onChange={(event) => setSelectedAssessmentKey(event.target.value)}
-                      className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-sky-400 focus:bg-white"
+                      disabled={!!selectedAssessmentKey && !submitted}
+                      className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-sky-400 focus:bg-white disabled:cursor-not-allowed disabled:bg-slate-200"
                     >
                       <option value="">Select an assessment</option>
                       {assessmentOptions.map((assessment) => (
@@ -499,12 +556,12 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
                   <div className="flex flex-wrap items-center gap-2">
                   <button onClick={handleBuildAndRunTests} className="inline-flex items-center gap-2 rounded-3xl bg-[#84BD00] px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-emerald-500">Build & Run Tests</button>
                   <button onClick={handleSubmit} className="inline-flex items-center gap-2 rounded-3xl bg-sky-500 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-sky-400">Submit</button>
-                  <button onClick={handleGetSolution} disabled={!timeExpired && !solutionUnlocked && !submitted} className="inline-flex items-center gap-2 rounded-3xl bg-slate-800 px-3 py-2 text-xs font-semibold text-white transition disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 hover:bg-slate-700">Get Solution</button>
+                  <button onClick={handleGetSolution} disabled={!submitted && !solutionUnlocked} className="inline-flex items-center gap-2 rounded-3xl bg-slate-800 px-3 py-2 text-xs font-semibold text-white transition disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 hover:bg-slate-700">Get Solution</button>
                   <button onClick={resetEditor} disabled={submitted} className="inline-flex items-center gap-2 rounded-3xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400">Reset</button>
                   </div>
                 </div>
               </div>
-              <div className="h-[calc(100vh-340px)] overflow-hidden rounded-3xl bg-slate-950">
+              <div className="min-h-[60vh] md:min-h-[70vh] lg:h-[calc(100vh-340px)] overflow-hidden rounded-3xl bg-slate-950">
                 {workspaceLoading ? (
                   <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-300">Loading {activeAssessment?.label || 'assessment'} workspace from backend...</div>
                 ) : !selectedAssessmentKey ? (
@@ -551,7 +608,7 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
               </div>
             </div>
 
-            <div className="grid gap-5 xl:grid-cols-[2fr_1fr]">
+            <div className="grid gap-5 lg:grid-cols-[2fr_1fr]">
               <ConsolePanel
                 activeTab={activeOutputTab}
                 outputLines={outputLines}

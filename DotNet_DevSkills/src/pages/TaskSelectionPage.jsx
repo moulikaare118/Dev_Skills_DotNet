@@ -42,7 +42,7 @@ export default function TaskSelectionPage({ theme, onToggleTheme }) {
           <ThemeToggle theme={theme} onToggleTheme={onToggleTheme} />
         </div>
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-3">
+        <div className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {taskCards.map((card) => (
             <button
               key={card.title}
