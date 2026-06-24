@@ -1,60 +1,85 @@
+using HON.Orders.Data;
+using HON.Orders.Domain.Entities;
+using HON.Orders.Domain.DTOs;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace HON.Orders.Web.Controllers
 {
-    /// <summary>
-    /// Order controller for viewing and creating orders
-    /// TODO: Implement order listing and creation
-    /// </summary>
-    public class OrderController : Controller
+  // TODO: Implement customer-facing order creation, validation, and dynamic line items.
+  public class OrderController : Controller
+  {
+    private readonly AppDbContext _context;
+
+    public OrderController(AppDbContext context)
     {
-        // TODO: Inject AppDbContext
-
-        public OrderController()
-        {
-            // TODO: Accept DbContext in constructor
-        }
-
-        /// <summary>
-        /// List customer's orders
-        /// TODO: Add pagination and filtering
-        /// </summary>
-        [HttpGet]
-        public IActionResult Index()
-        {
-            // TODO: Get orders from database
-            // - Filter by current user (or session/cookie for demo)
-            // - Order by OrderDate descending
-            // - Return to view
-            return View();
-        }
-
-        /// <summary>
-        /// Show create order form
-        /// </summary>
-        [HttpGet]
-        public IActionResult Create()
-        {
-            // TODO: Load customers for dropdown
-            // TODO: Load products for line items
-            // TODO: Return view with ViewModel
-            return View();
-        }
-
-        /// <summary>
-        /// Create new order (POST)
-        /// TODO: Handle dynamic line items binding
-        /// TODO: Implement validation and save
-        /// </summary>
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public IActionResult Create(dynamic orderViewModel)
-        {
-            // TODO: Validate model
-            // TODO: Create order with line items
-            // TODO: Save to database
-            // TODO: Implement PRG pattern (redirect to details or index)
-            return RedirectToAction("Index");
-        }
+      _context = context;
     }
+
+    [HttpGet]
+    public IActionResult Index(int page = 1)
+    {
+      const int pageSize = 20;
+      var orders = _context.Orders
+        .Include(o => o.Customer)
+        .Include(o => o.OrderItems)
+        .OrderByDescending(o => o.OrderDate)
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .ToList();
+
+      return View(orders);
+    }
+
+    [HttpGet]
+    // TODO: Prepare the order creation form with customers, products, and one empty line item.
+    public IActionResult Create()
+    {
+      var customers = _context.Customers.Where(c => !c.IsDeleted).ToList();
+      var products = _context.Products.Where(p => !p.IsDeleted).ToList();
+
+      var model = new CreateOrderViewModel
+      {
+        Customers = customers,
+        Products = products,
+        LineItems = new List<OrderLineItemViewModel> { new OrderLineItemViewModel() }
+      };
+
+      return View(model);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult Create(CreateOrderViewModel model)
+    {
+      if (!ModelState.IsValid)
+      {
+        model.Customers = _context.Customers.Where(c => !c.IsDeleted).ToList();
+        model.Products = _context.Products.Where(p => !p.IsDeleted).ToList();
+        return View(model);
+      }
+
+      var order = new Order
+      {
+        OrderNumber = Guid.NewGuid().ToString().Replace("-", "").ToUpperInvariant(),
+        CustomerId = model.CustomerId,
+        OrderDate = DateTime.UtcNow,
+        Status = OrderStatus.Pending,
+        Total = model.LineItems.Sum(li => li.Quantity * li.UnitPrice),
+        OrderItems = model.LineItems.Select(li => new OrderItem
+        {
+          ProductId = li.ProductId,
+          Quantity = li.Quantity,
+          UnitPrice = li.UnitPrice
+        }).ToList()
+      };
+
+      _context.Orders.Add(order);
+      _context.SaveChanges();
+
+      // TODO: Use PRG pattern and TempData notifications for successful order creation.
+      TempData["Success"] = "Order created successfully.";
+      return RedirectToAction(nameof(Index));
+    }
+  }
 }

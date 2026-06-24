@@ -107,7 +107,6 @@ const honOrdersSolutionBlocks = {
     }
 
       public override string ToString() => $"{Currency} {Amount:F2}";
-      public override string ToString() => $"${Currency} ${Amount:F2}";
 
     public static Money operator +(Money left, Money right)
     {
@@ -515,27 +514,833 @@ const honOrdersSolutionBlocks = {
 }`,
   'HON.Orders.Tests/DbContextTests.cs': `namespace HON.Orders.Tests
 {
-  public class DbContextTests
+  public class DbContextTests : IDisposable
   {
+    private readonly AppDbContext _context;
+
+    public DbContextTests()
+    {
+      var options = new DbContextOptionsBuilder<AppDbContext>()
+        .UseInMemoryDatabase(Guid.NewGuid().ToString())
+        .Options;
+
+      _context = new AppDbContext(options);
+      _context.Database.EnsureCreated();
+    }
+
+    [Fact]
+    public void AppDbContext_CanSaveAndLoadCustomer()
+    {
+      var customer = new Customer { Name = "Alice", Email = "alice@example.com" };
+      _context.Customers.Add(customer);
+      _context.SaveChanges();
+
+      var saved = _context.Customers.FirstOrDefault(c => c.Email == "alice@example.com");
+      Assert.NotNull(saved);
+      Assert.Equal("Alice", saved.Name);
+    }
+
+    public void Dispose()
+    {
+      _context.Dispose();
+    }
+  }
+}`,
+  'HON.Orders.Web/Program.cs': `using HON.Orders.Data;
+using HON.Orders.Domain.Services;
+using Microsoft.EntityFrameworkCore;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        sql => sql.MigrationsAssembly("HON.Orders.Data")));
+
+builder.Services.AddScoped<OrderService>();
+
+builder.Services.AddControllersWithViews();
+builder.Services.AddAuthorization();
+
+var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+  var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+  db.Database.Migrate();
+}
+
+if (!app.Environment.IsDevelopment())
+{
+  app.UseExceptionHandler("/Home/Error");
+  app.UseHsts();
+}
+
+app.UseHttpsRedirection();
+app.UseStaticFiles();
+
+app.UseRouting();
+app.UseAuthorization();
+
+app.MapControllerRoute(
+  name: "admin",
+  pattern: "admin/{controller=product}/{action=index}/{id?}",
+  defaults: new { area = "Admin" });
+
+app.MapControllerRoute(
+  name: "default",
+  pattern: "{controller=Home}/{action=Index}/{id?}");
+
+app.Run();
+`,
+  'HON.Orders.Web/Controllers/HomeController.cs': `using HON.Orders.Data;
+using HON.Orders.Domain.DTOs;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+namespace HON.Orders.Web.Controllers
+{
+  public class HomeController : Controller
+  {
+    private readonly AppDbContext _context;
+    private readonly ILogger<HomeController> _logger;
+
+    public HomeController(AppDbContext context, ILogger<HomeController> logger)
+    {
+      _context = context;
+      _logger = logger;
+    }
+
+    public IActionResult Index()
+    {
+      var totalOrders = _context.Orders.Count();
+      var pendingOrders = _context.Orders.Count(o => o.Status == OrderStatus.Pending);
+      var totalRevenue = _context.Orders.Sum(o => o.Total);
+      var recentOrders = _context.Orders
+        .Include(o => o.Customer)
+        .OrderByDescending(o => o.OrderDate)
+        .Take(5)
+        .ToList();
+
+      var model = new HomeDashboardViewModel
+      {
+        TotalOrders = totalOrders,
+        PendingOrders = pendingOrders,
+        TotalRevenue = totalRevenue,
+        RecentOrders = recentOrders
+      };
+
+      return View(model);
+    }
+
+    public IActionResult Privacy()
+    {
+      return View();
+    }
+
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+    public IActionResult Error()
+    {
+      return View();
+    }
+  }
+}
+`,
+  'HON.Orders.Web/Controllers/OrderController.cs': `using HON.Orders.Data;
+using HON.Orders.Domain.Entities;
+using HON.Orders.Domain.DTOs;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+namespace HON.Orders.Web.Controllers
+{
+  public class OrderController : Controller
+  {
+    private readonly AppDbContext _context;
+
+    public OrderController(AppDbContext context)
+    {
+      _context = context;
+    }
+
+    [HttpGet]
+    public IActionResult Index(int page = 1)
+    {
+      const int pageSize = 20;
+      var orders = _context.Orders
+        .Include(o => o.Customer)
+        .Include(o => o.OrderItems)
+        .OrderByDescending(o => o.OrderDate)
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .ToList();
+
+      return View(orders);
+    }
+
+    [HttpGet]
+    public IActionResult Create()
+    {
+      var customers = _context.Customers.Where(c => !c.IsDeleted).ToList();
+      var products = _context.Products.Where(p => !p.IsDeleted).ToList();
+
+      var model = new CreateOrderViewModel
+      {
+        Customers = customers,
+        Products = products,
+        LineItems = new List<OrderLineItemViewModel> { new OrderLineItemViewModel() }
+      };
+
+      return View(model);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult Create(CreateOrderViewModel model)
+    {
+      if (!ModelState.IsValid)
+      {
+        model.Customers = _context.Customers.Where(c => !c.IsDeleted).ToList();
+        model.Products = _context.Products.Where(p => !p.IsDeleted).ToList();
+        return View(model);
+      }
+
+      var order = new Order
+      {
+        OrderNumber = Guid.NewGuid().ToString().Replace("-", "").ToUpperInvariant(),
+        CustomerId = model.CustomerId,
+        OrderDate = DateTime.UtcNow,
+        Status = OrderStatus.Pending,
+        Total = model.LineItems.Sum(li => li.Quantity * li.UnitPrice),
+        OrderItems = model.LineItems.Select(li => new OrderItem
+        {
+          ProductId = li.ProductId,
+          Quantity = li.Quantity,
+          UnitPrice = li.UnitPrice
+        }).ToList()
+      };
+
+      _context.Orders.Add(order);
+      _context.SaveChanges();
+
+      TempData["Success"] = "Order created successfully.";
+      return RedirectToAction(nameof(Index));
+    }
+  }
+}
+`,
+  'HON.Orders.Web/Controllers/CatalogController.cs': `using HON.Orders.Data;
+using HON.Orders.Domain.Entities;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+namespace HON.Orders.Web.Controllers
+{
+  public class CatalogController : Controller
+  {
+    private readonly AppDbContext _context;
+
+    public CatalogController(AppDbContext context)
+    {
+      _context = context;
+    }
+
+    [HttpGet]
+    public IActionResult Index(int page = 1, string? search = null)
+    {
+      const int pageSize = 20;
+      var products = _context.Products.Where(p => !p.IsDeleted);
+
+      if (!string.IsNullOrEmpty(search))
+      {
+        products = products.Where(p => p.Name.Contains(search) || p.Sku.Contains(search) || p.Category.Contains(search));
+      }
+
+      var model = products
+        .OrderBy(p => p.Name)
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .ToList();
+
+      return View(model);
+    }
+
+    [HttpGet]
+    public IActionResult Details(int id)
+    {
+      var product = _context.Products.FirstOrDefault(p => p.Id == id && !p.IsDeleted);
+      if (product == null)
+      {
+        return NotFound();
+      }
+
+      return View(product);
+    }
+  }
+}
+`,
+  'HON.Orders.Web/Areas/Admin/Controllers/ProductController.cs': `using HON.Orders.Data;
+using HON.Orders.Domain.DTOs;
+using HON.Orders.Domain.Entities;
+using HON.Orders.Web.Filters;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+namespace HON.Orders.Web.Areas.Admin.Controllers
+{
+  [Area("Admin")]
+  [AdminRoleCheck]
+  public class ProductController : Controller
+  {
+    private readonly AppDbContext _context;
+
+    public ProductController(AppDbContext context)
+    {
+      _context = context;
+    }
+
+    [HttpGet]
+    public IActionResult Index(int page = 1)
+    {
+      const int pageSize = 20;
+      var products = _context.IncludeDeleted<Product>()
+        .OrderBy(p => p.Name)
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .ToList();
+
+      return View(products);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult Create(ProductViewModel model)
+    {
+      if (!ModelState.IsValid)
+      {
+        return View(model);
+      }
+
+      var product = new Product
+      {
+        Name = model.Name,
+        Sku = model.Sku,
+        UnitPrice = model.UnitPrice,
+        Category = model.Category,
+        StockQuantity = model.StockQuantity,
+        IsDeleted = false
+      };
+
+      _context.Products.Add(product);
+      _context.SaveChanges();
+      TempData["Success"] = "Product created successfully.";
+      return RedirectToAction(nameof(Index));
+    }
+
+    [HttpGet]
+    public IActionResult Edit(int id)
+    {
+      var product = _context.IncludeDeleted<Product>().FirstOrDefault(p => p.Id == id);
+      if (product == null)
+      {
+        return NotFound();
+      }
+
+      var model = new ProductViewModel
+      {
+        Id = product.Id,
+        Name = product.Name,
+        Sku = product.Sku,
+        UnitPrice = product.UnitPrice,
+        Category = product.Category,
+        StockQuantity = product.StockQuantity
+      };
+
+      return View(model);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult Edit(int id, ProductViewModel model)
+    {
+      if (!ModelState.IsValid)
+      {
+        return View(model);
+      }
+
+      var product = _context.IncludeDeleted<Product>().FirstOrDefault(p => p.Id == id);
+      if (product == null)
+      {
+        return NotFound();
+      }
+
+      product.Name = model.Name;
+      product.Sku = model.Sku;
+      product.UnitPrice = model.UnitPrice;
+      product.Category = model.Category;
+      product.StockQuantity = model.StockQuantity;
+
+      try
+      {
+        _context.SaveChanges();
+        TempData["Success"] = "Product updated successfully.";
+      }
+      catch (DbUpdateConcurrencyException)
+      {
+        TempData["Error"] = "The product was modified by another user. Please try again.";
+      }
+
+      return RedirectToAction(nameof(Index));
+    }
+
+    [HttpGet]
+    public IActionResult Delete(int id)
+    {
+      var product = _context.IncludeDeleted<Product>().FirstOrDefault(p => p.Id == id);
+      if (product == null)
+      {
+        return NotFound();
+      }
+
+      return View(product);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult DeleteConfirmed(int id)
+    {
+      var product = _context.IncludeDeleted<Product>().FirstOrDefault(p => p.Id == id);
+      if (product == null)
+      {
+        return NotFound();
+      }
+
+      product.IsDeleted = true;
+      _context.SaveChanges();
+      TempData["Success"] = "Product deleted successfully.";
+      return RedirectToAction(nameof(Index));
+    }
+  }
+}
+`,
+  'HON.Orders.Web/Areas/Admin/Views/Product/Create.cshtml': `@model HON.Orders.Domain.DTOs.ProductViewModel
+
+@{
+  ViewData["Title"] = "Create Product";
+}
+
+<div class="row mb-4">
+  <div class="col-md-8">
+    <h1>Create Product</h1>
+  </div>
+</div>
+
+@await Html.PartialAsync("_ValidationSummary")
+
+<form asp-action="Create" method="post" class="needs-validation">
+  @Html.AntiForgeryToken()
+
+  <div class="mb-3">
+    <label asp-for="Name" class="form-label"></label>
+    <input asp-for="Name" class="form-control" />
+    <span asp-validation-for="Name" class="text-danger"></span>
+  </div>
+
+  <div class="mb-3">
+    <label asp-for="Sku" class="form-label"></label>
+    <input asp-for="Sku" class="form-control" />
+    <span asp-validation-for="Sku" class="text-danger"></span>
+  </div>
+
+  <div class="mb-3">
+    <label asp-for="UnitPrice" class="form-label"></label>
+    <input asp-for="UnitPrice" type="number" step="0.01" class="form-control" />
+    <span asp-validation-for="UnitPrice" class="text-danger"></span>
+  </div>
+
+  <div class="mb-3">
+    <label asp-for="Category" class="form-label"></label>
+    <input asp-for="Category" class="form-control" />
+    <span asp-validation-for="Category" class="text-danger"></span>
+  </div>
+
+  <div class="mb-3">
+    <label asp-for="StockQuantity" class="form-label"></label>
+    <input asp-for="StockQuantity" type="number" class="form-control" />
+    <span asp-validation-for="StockQuantity" class="text-danger"></span>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-success">Create</button>
+    <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+  </div>
+</form>
+
+@section Scripts {
+  <partial name="_ValidationScriptsPartial" />
+}
+`,
+  'HON.Orders.Web/Areas/Admin/Views/Product/Index.cshtml': `@model IEnumerable<HON.Orders.Domain.Entities.Product>
+
+@{
+  ViewData["Title"] = "Product Management";
+}
+
+<div class="row mb-4">
+  <div class="col-md-8">
+    <h1>Products</h1>
+  </div>
+  <div class="col-md-4 text-end">
+    <a asp-action="Create" class="btn btn-primary">Add New Product</a>
+  </div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+  <div class="alert alert-success">@TempData["Success"]</div>
+}
+@if (TempData["Error"] != null)
+{
+  <div class="alert alert-danger">@TempData["Error"]</div>
+}
+
+<div class="table-responsive">
+  <table class="table table-striped table-hover">
+    <thead class="table-dark">
+      <tr>
+        <th>Name</th>
+        <th>SKU</th>
+        <th>Price</th>
+        <th>Category</th>
+        <th>Stock</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      @foreach (var product in Model)
+      {
+        <tr>
+          <td>@product.Name</td>
+          <td>@product.Sku</td>
+          <td>@product.UnitPrice.ToString("C")</td>
+          <td>@product.Category</td>
+          <td>@product.StockQuantity</td>
+          <td>@(product.IsDeleted ? "Deleted" : "Active")</td>
+          <td>
+            <a asp-action="Edit" asp-route-id="@product.Id" class="btn btn-sm btn-secondary">Edit</a>
+            <a asp-action="Delete" asp-route-id="@product.Id" class="btn btn-sm btn-danger">Delete</a>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>
+`,
+  'HON.Orders.Web/Views/Home/Index.cshtml': `@model HomeDashboardViewModel
+
+@{
+  ViewData["Title"] = "Dashboard";
+}
+
+<div class="row mb-4">
+  <div class="col-md-12">
+    <h1>Dashboard</h1>
+  </div>
+</div>
+
+<div class="row g-4 mb-5">
+  <div class="col-md-4">
+    <div class="card p-4">
+      <h5>Total Orders</h5>
+      <p class="display-6">@Model.TotalOrders</p>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card p-4">
+      <h5>Pending Orders</h5>
+      <p class="display-6">@Model.PendingOrders</p>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card p-4">
+      <h5>Total Revenue</h5>
+      <p class="display-6">@Model.TotalRevenue.ToString("C")</p>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    Recent Orders
+  </div>
+  <div class="table-responsive">
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>Order #</th>
+          <th>Customer</th>
+          <th>Date</th>
+          <th>Total</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach (var order in Model.RecentOrders)
+        {
+          <tr>
+            <td>@order.OrderNumber</td>
+            <td>@order.Customer.Name</td>
+            <td>@order.OrderDate.ToString("yyyy-MM-dd")</td>
+            <td>@order.Total.ToString("C")</td>
+            <td>@order.Status</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>
+`,
+  'HON.Orders.Web/Views/Shared/_Layout.cshtml': `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>@ViewData["Title"] - HON Orders</title>
+  <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="~/css/site.css" />
+</head>
+<body>
+  <header class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+    <div class="container-fluid">
+      <a class="navbar-brand" asp-controller="Home" asp-action="Index">HON Orders</a>
+      <div class="collapse navbar-collapse">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item"><a class="nav-link" asp-controller="Home" asp-action="Index">Dashboard</a></li>
+          <li class="nav-item"><a class="nav-link" asp-controller="Catalog" asp-action="Index">Catalog</a></li>
+          <li class="nav-item"><a class="nav-link" asp-controller="Order" asp-action="Index">Orders</a></li>
+          <li class="nav-item"><a class="nav-link" asp-area="Admin" asp-controller="Product" asp-action="Index">Admin</a></li>
+        </ul>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <main role="main" class="pb-3">
+      @RenderBody()
+    </main>
+  </div>
+
+  <script src="~/lib/jquery/dist/jquery.min.js"></script>
+  <script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
+  <script src="~/lib/jquery-validation-unobtrusive/dist/jquery.validate.unobtrusive.min.js"></script>
+  <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="~/js/site.js"></script>
+
+  @RenderSection("Scripts", required: false)
+</body>
+</html>
+`,
+  'HON.Orders.Web/wwwroot/js/site.js': `document.addEventListener('DOMContentLoaded', function () {
+  const orderForm = document.querySelector('form[action="Create"]');
+  if (!orderForm) {
+    return;
+  }
+
+  orderForm.addEventListener('input', updateOrderTotal);
+  orderForm.addEventListener('click', function (event) {
+    if (event.target.matches('[data-add-line-item]')) {
+      event.preventDefault();
+      addLineItem();
+    }
+    if (event.target.matches('[data-remove-line-item]')) {
+      event.preventDefault();
+      removeLineItem(event.target.closest('.line-item'));
+    }
+  });
+
+  updateOrderTotal();
+});
+
+function addLineItem() {
+  const template = document.querySelector('.line-item-template');
+  if (!template) {
+    return;
+  }
+
+  const clone = template.cloneNode(true);
+  clone.classList.remove('d-none', 'line-item-template');
+  clone.classList.add('line-item');
+  clone.querySelectorAll('input, select').forEach((input) => {
+    input.value = '';
+  });
+
+  const container = document.querySelector('#order-line-items');
+  container.appendChild(clone);
+  updateOrderTotal();
+}
+
+function removeLineItem(row) {
+  if (!row) {
+    return;
+  }
+
+  row.remove();
+  updateOrderTotal();
+}
+
+function updateLineTotal(quantity, unitPrice) {
+  return Number(quantity) * Number(unitPrice) || 0;
+}
+
+function updateOrderTotal() {
+  const rows = document.querySelectorAll('.line-item');
+  let total = 0;
+
+  rows.forEach((row) => {
+    const quantity = row.querySelector('[name*="Quantity"]').value;
+    const price = row.querySelector('[name*="UnitPrice"]').value;
+    const lineTotalField = row.querySelector('.line-total');
+    const lineTotal = updateLineTotal(quantity, price);
+
+    if (lineTotalField) {
+      lineTotalField.textContent = lineTotal.toFixed(2);
+    }
+
+    total += lineTotal;
+  });
+
+  const orderTotal = document.querySelector('#order-total');
+  if (orderTotal) {
+    orderTotal.textContent = total.toFixed(2);
+  }
+}
+`,
+  'HON.Orders.Domain/Entities/Customer.cs': `namespace HON.Orders.Domain.Entities
+{
+  public class Customer : IHasSoftDelete
+  {
+    public int Id { get; set; }
+    public string Name { get; set; } = null!;
+    public string Email { get; set; } = null!;
+    public bool IsDeleted { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime LastModifiedAt { get; set; }
+    public ICollection<Order> Orders { get; set; } = new List<Order>();
+  }
+}`,
+  'HON.Orders.Domain/Entities/Order.cs': `namespace HON.Orders.Domain.Entities
+{
+  public class Order : IHasSoftDelete
+  {
+    public int Id { get; set; }
+    public string OrderNumber { get; set; } = null!;
+    public int CustomerId { get; set; }
+    public DateTime OrderDate { get; set; } = DateTime.UtcNow;
+    public OrderStatus Status { get; set; } = OrderStatus.Pending;
+    public decimal Total { get; set; }
+    public byte[] RowVersion { get; set; } = null!;
+    public bool IsDeleted { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime LastModifiedAt { get; set; }
+    public Customer Customer { get; set; } = null!;
+    public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
+    public ICollection<Payment> Payments { get; set; } = new List<Payment>();
+  }
+}`,
+  'HON.Orders.Domain/Entities/OrderItem.cs': `namespace HON.Orders.Domain.Entities
+{
+  public class OrderItem : IHasSoftDelete
+  {
+    public int Id { get; set; }
+    public int OrderId { get; set; }
+    public int ProductId { get; set; }
+    public int Quantity { get; set; }
+    public decimal UnitPrice { get; set; }
+    public decimal LineTotal => Quantity * UnitPrice;
+    public bool IsDeleted { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public Order Order { get; set; } = null!;
+    public Product Product { get; set; } = null!;
+  }
+}`,
+  'HON.Orders.Domain/Entities/Payment.cs': `namespace HON.Orders.Domain.Entities
+{
+  public class Payment : IHasSoftDelete
+  {
+    public int Id { get; set; }
+    public int OrderId { get; set; }
+    public decimal Amount { get; set; }
+    public PaymentMethod Method { get; set; }
+    public DateTime? PaidAt { get; set; }
+    public bool IsDeleted { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public Order Order { get; set; } = null!;
+  }
+}`,
+  'HON.Orders.Domain/Entities/Product.cs': `namespace HON.Orders.Domain.Entities
+{
+  public class Product : IHasSoftDelete
+  {
+    public int Id { get; set; }
+    public string Name { get; set; } = null!;
+    public string Sku { get; set; } = null!;
+    public decimal UnitPrice { get; set; }
+    public string? Category { get; set; }
+    public int StockQuantity { get; set; }
+    public byte[] RowVersion { get; set; } = null!;
+    public bool IsDeleted { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime LastModifiedAt { get; set; }
+    public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
   }
 }`
 };
 
 function applyHonOrdersSolutionOverlay(files, mode, assessmentKey) {
-  if (mode !== 'solution' || assessmentKey !== 'hon-orders') {
-  return files;
+  if (assessmentKey !== 'hon-orders') {
+    return files;
+  }
+
+  function getExt(path) {
+    const idx = path.lastIndexOf('.');
+    return idx >= 0 ? path.slice(idx).toLowerCase() : '';
+  }
+
+  function wrapAsComment(text, ext) {
+    if (!text) return '';
+    // Use Razor comment for .cshtml to avoid breaking razor syntax
+    if (ext === '.cshtml') {
+      return `@*\n${text}\n*@`;
+    }
+    // Use block comment for C#/JS/JSON/XML-like files
+    return `/*\n${text}\n*/`;
+  }
+
+  function extractTodoLines(origContent) {
+    if (!origContent) return null;
+    const lines = origContent.split(/\r?\n/).map(l => l.trim());
+    const todos = lines.filter(l => /TODO/i.test(l));
+    if (!todos.length) return null;
+    return todos.map(l => l.replace(/^\/\/?\s?/, '')).join('\n');
   }
 
   return files.map((file) => {
-  const solutionBlock = honOrdersSolutionBlocks[file.path];
-  if (!solutionBlock) {
-    return file;
-  }
+    const solutionBlock = honOrdersSolutionBlocks[file.path];
+    if (!solutionBlock) {
+      return file;
+    }
 
-  return {
-    ...file,
-    content: appendSolutionOverlay(file.content, solutionBlock)
-  };
+    // Extract TODO/task lines from the original file content and prepend as comment
+    const origContent = file.content || '';
+    const todoText = extractTodoLines(origContent);
+    const ext = getExt(file.path);
+    const comment = todoText ? wrapAsComment(`TASKS:\n${todoText}`, ext) + '\n\n' : '';
+
+    return {
+      ...file,
+      content: comment + solutionBlock
+    };
   });
 }
 
@@ -739,7 +1544,7 @@ async function runDotnetCommand(cwd, mode) {
   return { command, result };
 }
 
-function formatDotnetResult({ command, result }, mode) {
+function formatDotnetResult(result, command, mode) {
   const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
 
   return output || [
@@ -791,17 +1596,18 @@ async function evaluateProjectBuildAndTest(files, assessmentKey) {
   const { starterRoot, solutionFile } = await getAssessmentExecutionConfig(assessmentKey);
   const { tempRoot, projectRoot } = await createProjectWorkspace(files, starterRoot);
   try {
-    const buildResult = await runCommand('dotnet', ['build', solutionFile], projectRoot);
-    const buildOutput = formatDotnetResult(buildResult, 'build');
+    const buildCommand = ['build', solutionFile];
+    const buildResult = await runCommand('dotnet', buildCommand, projectRoot);
+    const buildOutput = formatDotnetResult(buildResult, buildCommand, 'build');
 
-    if (buildResult.result.code !== 0) {
+    if (buildResult.code !== 0) {
       return {
         success: false,
-        exitCode: buildResult.result.code,
+        exitCode: buildResult.code,
         output: buildOutput,
         buildResult: {
           success: false,
-          exitCode: buildResult.result.code,
+          exitCode: buildResult.code,
           output: buildOutput
         },
         testResult: null,
@@ -809,21 +1615,22 @@ async function evaluateProjectBuildAndTest(files, assessmentKey) {
       };
     }
 
-    const testResult = await runCommand('dotnet', ['test', solutionFile, '-v', 'normal', '--logger', 'console;verbosity=normal'], projectRoot);
-    const testOutput = formatDotnetResult(testResult, 'test');
+    const testCommand = ['test', solutionFile, '-v', 'normal', '--logger', 'console;verbosity=normal'];
+    const testResult = await runCommand('dotnet', testCommand, projectRoot);
+    const testOutput = formatDotnetResult(testResult, testCommand, 'test');
 
     return {
-      success: testResult.result.code === 0,
-      exitCode: testResult.result.code,
+      success: testResult.code === 0,
+      exitCode: testResult.code,
       output: [buildOutput, testOutput].filter(Boolean).join('\n\n'),
       buildResult: {
         success: true,
-        exitCode: buildResult.result.code,
+        exitCode: buildResult.code,
         output: buildOutput
       },
       testResult: {
-        success: testResult.result.code === 0,
-        exitCode: testResult.result.code,
+        success: testResult.code === 0,
+        exitCode: testResult.code,
         output: testOutput
       },
       workspaceRoot: projectRoot

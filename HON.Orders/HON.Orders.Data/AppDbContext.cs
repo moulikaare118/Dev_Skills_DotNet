@@ -1,70 +1,97 @@
-using HON.Orders.Domain.Entities;
-using Microsoft.EntityFrameworkCore;
-using System.Linq.Expressions;
-
 namespace HON.Orders.Data
 {
-    /// <summary>
-    /// Application database context
-    /// TODO: Configure all entities with Fluent API
-    /// TODO: Configure relationships, indices, shadows, concurrency tokens
-    /// </summary>
-    public class AppDbContext : DbContext
+  public class AppDbContext : DbContext
+  {
+    public DbSet<Customer> Customers { get; set; }
+    public DbSet<Product> Products { get; set; }
+    public DbSet<Order> Orders { get; set; }
+    public DbSet<OrderItem> OrderItems { get; set; }
+    public DbSet<Payment> Payments { get; set; }
+    public DbSet<AuditLog> AuditLogs { get; set; }
+
+    public AppDbContext(DbContextOptions<AppDbContext> options)
+      : base(options)
     {
-        public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
-        {
-        }
-
-        public DbSet<Customer> Customers { get; set; }
-        public DbSet<Product> Products { get; set; }
-        public DbSet<Order> Orders { get; set; }
-        public DbSet<OrderItem> OrderItems { get; set; }
-        public DbSet<Payment> Payments { get; set; }
-        public DbSet<AuditLog> AuditLogs { get; set; }
-
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
-        {
-            base.OnModelCreating(modelBuilder);
-
-            // TODO: Configure entities using Fluent API
-            // 
-            // Configuration needed for each entity:
-            // - Relationships (One-to-Many)
-            // - Unique constraints (Email, OrderNumber, Sku)
-            // - Decimal precision (18,2)
-            // - String lengths
-            // - Concurrency tokens (RowVersion)
-            // - Shadow properties (CreatedAt, LastModifiedAt)
-            // - Soft delete query filters (IsDeleted = false)
-            // 
-            // Example pattern:
-            // modelBuilder.Entity<Customer>()
-            //     .HasMany(c => c.Orders)
-            //     .WithOne(o => o.Customer)
-            //     .HasForeignKey(o => o.CustomerId);
-
-            SeedData(modelBuilder);
-        }
-
-        /// <summary>
-        /// Seeds initial test data
-        /// TODO: Add seed data for testing
-        /// </summary>
-        private static void SeedData(ModelBuilder modelBuilder)
-        {
-            // TODO: Seed at least 3 customers, 5 products, 3 orders with items
-            // Example:
-            // var customer1 = new Customer { Id = 1, Name = "Alice", Email = "alice@example.com" };
-            // modelBuilder.Entity<Customer>().HasData(customer1);
-        }
-
-        /// <summary>
-        /// Gets a queryable including soft-deleted records
-        /// TODO: Used by admin to view deleted records
-        /// </summary>
-        public IQueryable<T> IncludeDeleted<T>() where T : class, IHasSoftDelete
-        {
-            return Set<T>().IgnoreQueryFilters();
-        }
     }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+      base.OnModelCreating(modelBuilder);
+
+      // TODO: Configure Fluent API for decimal precision, rowversion concurrency,
+      // relationships, soft delete filters, and shadow audit properties.
+
+      modelBuilder.Entity<Customer>()
+        .HasIndex(c => c.Email)
+        .IsUnique();
+
+      modelBuilder.Entity<Product>()
+        .Property(p => p.UnitPrice)
+        .HasPrecision(18, 2);
+
+      modelBuilder.Entity<Product>()
+        .Property(p => p.RowVersion)
+        .IsRowVersion();
+
+      modelBuilder.Entity<Order>()
+        .HasIndex(o => o.OrderNumber)
+        .IsUnique();
+
+      modelBuilder.Entity<Order>()
+        .Property(o => o.Total)
+        .HasPrecision(18, 2);
+
+      modelBuilder.Entity<Order>()
+        .Property(o => o.RowVersion)
+        .IsRowVersion();
+
+      modelBuilder.Entity<Order>()
+        .HasOne(o => o.Customer)
+        .WithMany(c => c.Orders)
+        .HasForeignKey(o => o.CustomerId)
+        .OnDelete(DeleteBehavior.Cascade);
+
+      modelBuilder.Entity<OrderItem>()
+        .HasOne(oi => oi.Order)
+        .WithMany(o => o.OrderItems)
+        .HasForeignKey(oi => oi.OrderId)
+        .OnDelete(DeleteBehavior.Cascade);
+
+      modelBuilder.Entity<OrderItem>()
+        .HasOne(oi => oi.Product)
+        .WithMany(p => p.OrderItems)
+        .HasForeignKey(oi => oi.ProductId);
+
+      modelBuilder.Entity<Payment>()
+        .HasOne(p => p.Order)
+        .WithMany(o => o.Payments)
+        .HasForeignKey(p => p.OrderId)
+        .OnDelete(DeleteBehavior.Cascade);
+
+      modelBuilder.Entity<Customer>().HasQueryFilter(c => !c.IsDeleted);
+      modelBuilder.Entity<Product>().HasQueryFilter(p => !p.IsDeleted);
+      modelBuilder.Entity<Order>().HasQueryFilter(o => !o.IsDeleted);
+      modelBuilder.Entity<OrderItem>().HasQueryFilter(oi => !oi.IsDeleted);
+      modelBuilder.Entity<Payment>().HasQueryFilter(p => !p.IsDeleted);
+
+      // TODO: Use a global soft delete query filter and expose IncludeDeleted<T>()
+      // for admin screens that must show deleted records.
+
+      foreach (var entity in modelBuilder.Model.GetEntityTypes())
+      {
+        modelBuilder.Entity(entity.ClrType)
+          .Property<DateTime>("CreatedAt")
+          .HasDefaultValueSql("GETUTCDATE()");
+
+        modelBuilder.Entity(entity.ClrType)
+          .Property<DateTime>("LastModifiedAt")
+          .HasDefaultValueSql("GETUTCDATE()");
+      }
+    }
+  }
+
+  public interface IHasSoftDelete
+  {
+    bool IsDeleted { get; set; }
+  }
 }

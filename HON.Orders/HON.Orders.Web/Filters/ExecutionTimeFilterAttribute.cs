@@ -1,29 +1,24 @@
-using System.Diagnostics;
-
 namespace HON.Orders.Web.Filters
 {
-    /// <summary>
-    /// Action filter that logs execution time and adds Server-Timing header
-    /// TODO: Implement timer, calculate elapsed time, add response header
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
-    public class ExecutionTimeFilterAttribute : ActionFilterAttribute
+  [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
+  // TODO: Log action execution time and add Server-Timing header for diagnostics.
+  public class ExecutionTimeFilterAttribute : ActionFilterAttribute
+  {
+    private Stopwatch _stopwatch;
+
+    public override void OnActionExecuting(ActionExecutingContext context)
     {
-        private Stopwatch _stopwatch = null!;
-
-        public override void OnActionExecuting(ActionExecutingContext context)
-        {
-            // TODO: Start stopwatch
-            base.OnActionExecuting(context);
-        }
-
-        public override void OnActionExecuted(ActionExecutedContext context)
-        {
-            // TODO: Stop stopwatch
-            // TODO: Calculate elapsed milliseconds
-            // TODO: Add "Server-Timing" response header
-            // TODO: Log to console
-            base.OnActionExecuted(context);
-        }
+      _stopwatch = Stopwatch.StartNew();
+      base.OnActionExecuting(context);
     }
+
+    public override void OnActionExecuted(ActionExecutedContext context)
+    {
+      _stopwatch.Stop();
+      var elapsedMs = _stopwatch.ElapsedMilliseconds;
+      context.HttpContext.Response.Headers.Add("Server-Timing", $"total;dur={elapsedMs}");
+      Console.WriteLine($"[{context.ActionDescriptor.DisplayName}] Executed in {elapsedMs}ms");
+      base.OnActionExecuted(context);
+    }
+  }
 }

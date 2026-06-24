@@ -1,68 +1,58 @@
-using HON.Orders.Data;
-using HON.Orders.Domain.Entities;
-using HON.Orders.Domain.Services;
-using Microsoft.EntityFrameworkCore;
-
 namespace HON.Orders.Tests
 {
-    /// <summary>
-    /// Unit tests for OrderService
-    /// TODO: Implement all test methods
-    /// </summary>
-    public class OrderServiceTests
+  public class OrderServiceTests : IDisposable
+  {
+    private readonly AppDbContext _context;
+    private readonly OrderService _service;
+
+    public OrderServiceTests()
     {
-        private AppDbContext CreateInMemoryContext()
-        {
-            // TODO: Create in-memory database context
-            // var options = new DbContextOptionsBuilder<AppDbContext>()
-            //     .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            //     .Options;
-            // return new AppDbContext(options);
-            
-            throw new NotImplementedException("TODO: Implement in-memory context creation");
-        }
+      var options = new DbContextOptionsBuilder<AppDbContext>()
+        .UseInMemoryDatabase(Guid.NewGuid().ToString())
+        .Options;
 
-        private void SeedTestData(AppDbContext context)
-        {
-            // TODO: Seed test data
-            // - Create customers
-            // - Create products
-            // - Create orders with items
-        }
+      _context = new AppDbContext(options);
+      _service = new OrderService(_context);
 
-        [Fact]
-        public void GetTopCustomersByRevenue_ReturnsTopFiveCustomers()
-        {
-            // TODO: Arrange
-            // var context = CreateInMemoryContext();
-            // SeedTestData(context);
-            // var service = new OrderService(context);
-
-            // TODO: Act
-            // var result = service.GetTopCustomersByRevenue(30, 5).ToList();
-
-            // TODO: Assert
-            // Assert.True(result.Count > 0);
-        }
-
-        [Fact]
-        public async Task StreamOrdersAsync_YieldsResultsInPages()
-        {
-            // TODO: Arrange
-            // var context = CreateInMemoryContext();
-            // SeedTestData(context);
-            // var service = new OrderService(context);
-            // var since = DateTime.UtcNow.AddDays(-60);
-            // var orders = new List<Order>();
-
-            // TODO: Act
-            // await foreach (var order in service.StreamOrdersAsync(since, pageSize: 2))
-            // {
-            //     orders.Add(order);
-            // }
-
-            // TODO: Assert
-            // Assert.True(orders.Count > 0);
-        }
+      SeedTestData();
     }
+
+    [Fact]
+    public void GetTopCustomersByRevenue_ReturnsTopFiveCustomers()
+    {
+      var result = _service.GetTopCustomersByRevenue(30, 5).ToList();
+      Assert.Equal(2, result.Count);
+      Assert.Equal("Alice", result[0].CustomerName);
+      Assert.True(result[0].Revenue > 0);
+    }
+
+    [Fact]
+    public async Task StreamOrdersAsync_YieldsResultsInPages()
+    {
+      var since = DateTime.UtcNow.AddDays(-60);
+      var orders = new List<Order>();
+
+      await foreach (var order in _service.StreamOrdersAsync(since, pageSize: 2))
+      {
+        orders.Add(order);
+      }
+
+      Assert.True(orders.Count > 0);
+    }
+
+    private void SeedTestData()
+    {
+      var customer = new Customer { Name = "Alice", Email = "alice@example.com" };
+      var product = new Product { Name = "Widget", Sku = "WID001", UnitPrice = 99.99m };
+
+      _context.Customers.Add(customer);
+      _context.Products.Add(product);
+      _context.SaveChanges();
+    }
+
+    public void Dispose()
+    {
+      _context.Dispose();
+    }
+  }
 }

@@ -1,44 +1,50 @@
+using HON.Orders.Data;
+using HON.Orders.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace HON.Orders.Web.Controllers
 {
-    /// <summary>
-    /// Catalog controller for browsing products
-    /// TODO: Implement product listing and details
-    /// </summary>
-    public class CatalogController : Controller
+  // TODO: Implement catalog browsing and search UX with soft delete filtering.
+  public class CatalogController : Controller
+  {
+    private readonly AppDbContext _context;
+
+    public CatalogController(AppDbContext context)
     {
-        // TODO: Inject AppDbContext
-
-        public CatalogController()
-        {
-            // TODO: Accept DbContext in constructor
-        }
-
-        /// <summary>
-        /// List all products with pagination
-        /// TODO: Add pagination, search, category filter
-        /// </summary>
-        [HttpGet]
-        public IActionResult Index(int page = 1)
-        {
-            // TODO: Get products from database
-            // - Implement pagination (20 per page)
-            // - Optional: add category filter
-            // - Return to view
-            return View();
-        }
-
-        /// <summary>
-        /// Show product details
-        /// </summary>
-        [HttpGet]
-        public IActionResult Details(int id)
-        {
-            // TODO: Get product by ID
-            // - Return 404 if not found
-            // - Return to view
-            return View();
-        }
+      _context = context;
     }
+
+    [HttpGet]
+    public IActionResult Index(int page = 1, string? search = null)
+    {
+      const int pageSize = 20;
+      var products = _context.Products.Where(p => !p.IsDeleted);
+
+      if (!string.IsNullOrEmpty(search))
+      {
+        products = products.Where(p => p.Name.Contains(search) || p.Sku.Contains(search) || p.Category.Contains(search));
+      }
+
+      var model = products
+        .OrderBy(p => p.Name)
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .ToList();
+
+      return View(model);
+    }
+
+    [HttpGet]
+    public IActionResult Details(int id)
+    {
+      var product = _context.Products.FirstOrDefault(p => p.Id == id && !p.IsDeleted);
+      if (product == null)
+      {
+        return NotFound();
+      }
+
+      return View(product);
+    }
+  }
 }

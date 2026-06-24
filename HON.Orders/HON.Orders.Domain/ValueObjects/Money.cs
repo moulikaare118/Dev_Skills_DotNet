@@ -1,46 +1,52 @@
 namespace HON.Orders.Domain.ValueObjects
 {
-    /// <summary>
-    /// Immutable Money value object
-    /// TODO: Implement immutability and operators
-    /// - Implement: +, -, *, /
-    /// - Implement: Equals(), GetHashCode()
-    /// - Implement: ToString()
-    /// - Add currency validation
-    /// </summary>
-    public class Money
+  // TODO: Ensure Money is immutable, supports formatting, arithmetic operators,
+  // and that the decimal extension FormatMoney delegates to Money formatting.
+  public class Money : IEquatable<Money>
+  {
+    public decimal Amount { get; }
+    public string Currency { get; }
+
+    public Money(decimal amount, string currency = "USD")
     {
-        public decimal Amount { get; }
-        public string Currency { get; }
-
-        public Money(decimal amount, string currency = "USD")
-        {
-            // TODO: Validate amount >= 0
-            Amount = amount;
-            Currency = currency;
-        }
-
-        public override string ToString()
-        {
-            // TODO: Return formatted string like "USD 99.99"
-            return $"{Currency} {Amount:F2}";
-        }
-
-        // TODO: Implement operators (+, -, *, /)
-        // TODO: Implement Equals() and GetHashCode()
+      if (amount < 0)
+        throw new ArgumentException("Amount cannot be negative", nameof(amount));
+      Amount = amount;
+      Currency = currency;
     }
 
-    /// <summary>
-    /// Extension methods for formatting money
-    /// </summary>
-    public static class DecimalExtensions
+      public override string ToString() => $"{Currency} {Amount:F2}";
+
+    public static Money operator +(Money left, Money right)
     {
-        /// <summary>
-        /// Formats decimal as currency using Money value object
-        /// </summary>
-        public static string FormatMoney(this decimal amount, string currency = "USD")
-        {
-            return new Money(amount, currency).ToString();
-        }
+      if (left.Currency != right.Currency)
+        throw new InvalidOperationException("Cannot add money with different currencies");
+      return new Money(left.Amount + right.Amount, left.Currency);
     }
+
+    public static Money operator -(Money left, Money right)
+    {
+      if (left.Currency != right.Currency)
+        throw new InvalidOperationException("Cannot subtract money with different currencies");
+      return new Money(left.Amount - right.Amount, left.Currency);
+    }
+
+    public static Money operator *(Money money, decimal multiplier)
+      => new Money(money.Amount * multiplier, money.Currency);
+
+    public bool Equals(Money other)
+      => other != null && Amount == other.Amount && Currency == other.Currency;
+
+    public override bool Equals(object obj)
+      => Equals(obj as Money);
+
+    public override int GetHashCode()
+      => HashCode.Combine(Amount, Currency);
+  }
+
+  public static class DecimalExtensions
+  {
+    public static string FormatMoney(this decimal amount, string currency = "USD")
+      => new Money(amount, currency).ToString();
+  }
 }

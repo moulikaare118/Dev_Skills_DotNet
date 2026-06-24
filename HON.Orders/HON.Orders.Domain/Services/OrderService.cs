@@ -1,54 +1,69 @@
-using HON.Orders.Domain.DTOs;
-using HON.Orders.Domain.Entities;
-using System.Runtime.CompilerServices;
-
 namespace HON.Orders.Domain.Services
 {
-    /// <summary>
-    /// Service for order-related operations
-    /// TODO: Implement all methods with LINQ queries
-    /// </summary>
-    public class OrderService
+  // TODO: Implement revenue analysis, async order streaming, and dynamic EF filter
+  // composition for the HON Orders assessment requirements.
+  public class OrderService
+  {
+    private readonly AppDbContext _context;
+
+    public OrderService(AppDbContext context)
     {
-        // TODO: Inject AppDbContext
-        
-        public OrderService()
-        {
-            // TODO: Accept DbContext in constructor
-        }
-
-        /// <summary>
-        /// Gets top N customers by revenue in the last M days
-        /// TODO: Implement using GroupBy, SelectMany, OrderByDescending
-        /// </summary>
-        public IEnumerable<TopCustomerDto> GetTopCustomersByRevenue(int days = 30, int topCount = 5)
-        {
-            // TODO: Implement LINQ query
-            // Hints:
-            // - Filter orders from last 'days' days
-            // - Group by Customer
-            // - Calculate total revenue (sum of OrderItems.LineTotal)
-            // - Order by revenue descending
-            // - Take top 'topCount'
-            return Enumerable.Empty<TopCustomerDto>();
-        }
-
-        /// <summary>
-        /// Streams orders asynchronously with pagination
-        /// TODO: Implement using IAsyncEnumerable and yield return
-        /// </summary>
-        public async IAsyncEnumerable<Order> StreamOrdersAsync(
-            DateTime since,
-            int pageSize = 20,
-            [EnumeratorCancellation] CancellationToken ct = default)
-        {
-            // TODO: Implement async iterator
-            // Hints:
-            // - Use Skip() and Take() for pagination
-            // - Yield results lazily
-            // - Support cancellation token
-            await Task.CompletedTask;
-            yield break;
-        }
+      _context = context;
     }
+
+    public IEnumerable<TopCustomerDto> GetTopCustomersByRevenue(int days = 30, int topCount = 5)
+    {
+      var since = DateTime.UtcNow.AddDays(-days);
+
+      return _context.Orders
+        .Where(o => o.OrderDate >= since)
+        .Include(o => o.OrderItems)
+        .GroupBy(o => o.Customer)
+        .Select(g => new TopCustomerDto
+        {
+          CustomerName = g.Key.Name,
+          OrdersCount = g.Count(),
+          Revenue = g.SelectMany(o => o.OrderItems)
+            .Sum(oi => oi.LineTotal)
+        })
+        .OrderByDescending(x => x.Revenue)
+        .Take(topCount)
+        .ToList();
+    }
+
+    public async IAsyncEnumerable<Order> StreamOrdersAsync(
+      DateTime since,
+      int pageSize = 20,
+      [EnumeratorCancellation] CancellationToken ct = default)
+    {
+      int skip = 0;
+
+      while (true)
+      {
+        var orders = await _context.Orders
+          .Where(o => o.OrderDate >= since)
+          .OrderByDescending(o => o.OrderDate)
+          .Include(o => o.Customer)
+          .Include(o => o.OrderItems)
+          .Skip(skip)
+          .Take(pageSize)
+          .ToListAsync(ct);
+
+        if (!orders.Any())
+          break;
+
+        foreach (var order in orders)
+          yield return order;
+
+        skip += pageSize;
+      }
+    }
+  }
+
+  public class TopCustomerDto
+  {
+    public string CustomerName { get; set; }
+    public int OrdersCount { get; set; }
+    public decimal Revenue { get; set; }
+  }
 }

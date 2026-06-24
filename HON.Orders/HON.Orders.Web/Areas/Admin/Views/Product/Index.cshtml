@@ -1,38 +1,57 @@
+@model IEnumerable<HON.Orders.Domain.Entities.Product>
+
 @{
-    ViewData["Title"] = "Product Management";
+  ViewData["Title"] = "Product Management";
 }
 
 <div class="row mb-4">
-    <div class="col-md-8">
-        <h1>Products</h1>
-    </div>
-    <div class="col-md-4 text-end">
-        <a asp-action="Create" class="btn btn-primary">Add New Product</a>
-    </div>
+  <div class="col-md-8">
+    <h1>Products</h1>
+  </div>
+  <div class="col-md-4 text-end">
+    <a asp-action="Create" class="btn btn-primary">Add New Product</a>
+  </div>
 </div>
 
-<!-- TODO: Add TempData success/error message display -->
+@if (TempData["Success"] != null)
+{
+  <div class="alert alert-success">@TempData["Success"]</div>
+}
+@if (TempData["Error"] != null)
+{
+  <div class="alert alert-danger">@TempData["Error"]</div>
+}
 
 <div class="table-responsive">
-    <table class="table table-striped table-hover">
-        <thead class="table-dark">
-            <tr>
-                <th>Name</th>
-                <th>SKU</th>
-                <th>Price</th>
-                <th>Category</th>
-                <th>Stock</th>
-                <th>Status</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <!-- TODO: Loop through products and display rows -->
-            <tr>
-                <td colspan="7" class="text-center text-muted">No products found. <a asp-action="Create">Create one</a></td>
-            </tr>
-        </tbody>
-    </table>
+  <!-- TODO: Admin product list should clearly indicate deleted records and preserve actions for editing and deleting. -->
+  <table class="table table-striped table-hover">
+    <thead class="table-dark">
+      <tr>
+        <th>Name</th>
+        <th>SKU</th>
+        <th>Price</th>
+        <th>Category</th>
+        <th>Stock</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      @foreach (var product in Model)
+      {
+        <tr>
+          <td>@product.Name</td>
+          <td>@product.Sku</td>
+          <td>@product.UnitPrice.ToString("C")</td>
+          <td>@product.Category</td>
+          <td>@product.StockQuantity</td>
+          <td>@(product.IsDeleted ? "Deleted" : "Active")</td>
+          <td>
+            <a asp-action="Edit" asp-route-id="@product.Id" class="btn btn-sm btn-secondary">Edit</a>
+            <a asp-action="Delete" asp-route-id="@product.Id" class="btn btn-sm btn-danger">Delete</a>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
 </div>
-
-<!-- TODO: Add pagination controls -->

@@ -1,44 +1,75 @@
-// HON Orders - Main JavaScript
-
+// TODO: Add client-side order form behavior for dynamic line items and live totals.
 document.addEventListener('DOMContentLoaded', function () {
-    // TODO: Add dynamic line item functionality
-    // - Add/Remove order line items
-    // - Calculate line totals
-    // - Calculate order total
+  const orderForm = document.querySelector('form[action="Create"]');
+  if (!orderForm) {
+    return;
+  }
 
-    // TODO: Add form validation
-    // - Client-side validation using jQuery Unobtrusive Validation
-    // - Display validation messages
-    // - Disable submit button until valid
+  orderForm.addEventListener('input', updateOrderTotal);
+  orderForm.addEventListener('click', function (event) {
+    if (event.target.matches('[data-add-line-item]')) {
+      event.preventDefault();
+      addLineItem();
+    }
+    if (event.target.matches('[data-remove-line-item]')) {
+      event.preventDefault();
+      removeLineItem(event.target.closest('.line-item'));
+    }
+  });
 
-    console.log('HON Orders JS loaded');
+  updateOrderTotal();
 });
 
-/**
- * TODO: Add Line Item Management Functions
- */
-
 function addLineItem() {
-    // TODO: Implement dynamic line item addition
-    // - Clone template row
-    // - Update indices
-    // - Append to form
+  const template = document.querySelector('.line-item-template');
+  if (!template) {
+    return;
+  }
+
+  const clone = template.cloneNode(true);
+  clone.classList.remove('d-none', 'line-item-template');
+  clone.classList.add('line-item');
+  clone.querySelectorAll('input, select').forEach((input) => {
+    input.value = '';
+  });
+
+  const container = document.querySelector('#order-line-items');
+  container.appendChild(clone);
+  updateOrderTotal();
 }
 
-function removeLineItem(index) {
-    // TODO: Implement dynamic line item removal
-    // - Remove row
-    // - Update indices
-    // - Recalculate total
+function removeLineItem(row) {
+  if (!row) {
+    return;
+  }
+
+  row.remove();
+  updateOrderTotal();
 }
 
 function updateLineTotal(quantity, unitPrice) {
-    // TODO: Calculate line total
-    return quantity * unitPrice;
+  return Number(quantity) * Number(unitPrice) || 0;
 }
 
 function updateOrderTotal() {
-    // TODO: Calculate order total
-    // - Sum all line totals
-    // - Update display
+  const rows = document.querySelectorAll('.line-item');
+  let total = 0;
+
+  rows.forEach((row) => {
+    const quantity = row.querySelector('[name*="Quantity"]').value;
+    const price = row.querySelector('[name*="UnitPrice"]').value;
+    const lineTotalField = row.querySelector('.line-total');
+    const lineTotal = updateLineTotal(quantity, price);
+
+    if (lineTotalField) {
+      lineTotalField.textContent = lineTotal.toFixed(2);
+    }
+
+    total += lineTotal;
+  });
+
+  const orderTotal = document.querySelector('#order-total');
+  if (orderTotal) {
+    orderTotal.textContent = total.toFixed(2);
+  }
 }
