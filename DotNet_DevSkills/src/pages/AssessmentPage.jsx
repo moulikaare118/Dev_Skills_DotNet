@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Timer from '../components/Timer';
 import UploadSection from '../components/UploadSection';
+import BuildAndTestPanel from '../components/BuildAndTestPanel';
 import TimeExpiredModal from '../components/TimeExpiredModal';
 import SubmissionRecordedModal from '../components/SubmissionRecordedModal';
 import ThemeToggle from '../components/ThemeToggle';
@@ -161,6 +162,8 @@ export default function AssessmentPage({ theme, onToggleTheme }) {
           </div>
 
           <UploadSection onFileUploaded={setUploadedFile} disabled={submitted || timeExpired} />
+
+          <BuildAndTestPanel uploadedFile={uploadedFile} disabled={submitted || timeExpired} />
 
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <p className="text-sm text-slate-600">Latest uploaded file: <span className="font-semibold text-slate-900">{fileName}</span></p>
