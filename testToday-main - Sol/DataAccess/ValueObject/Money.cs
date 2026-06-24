@@ -23,7 +23,11 @@ namespace DataAccess.ValueObject
             // - Store currency in uppercase.
             // - Amount should be immutable.
 
-            throw new NotImplementedException();
+            if (string.IsNullOrWhiteSpace(currency) || currency.Length != 3)
+                throw new ArgumentException("Currency must be a 3-letter ISO code.", nameof(currency));
+
+            Amount = amount;
+            Currency = currency.ToUpperInvariant();
         }
 
         // Formatting
@@ -34,7 +38,7 @@ namespace DataAccess.ValueObject
             //      "INR 1,234.00"
             // - Currency first, followed by space.
             // - Amount formatted with 2 decimal places
-            throw new NotImplementedException();
+            return $"{Currency} {Amount:N2}";
         }
 
         // Arithmetic Operators
@@ -45,7 +49,7 @@ namespace DataAccess.ValueObject
             // - Ensure both have same currency.
             // - Return new Money instance.
             EnsureSameCurrency(a,b);
-            throw new NotImplementedException();
+            return new Money(a.Amount + b.Amount, a.Currency);
 
         }
 
@@ -54,7 +58,8 @@ namespace DataAccess.ValueObject
             // TODO:
             // - Subtract two Money objects.
             // - Ensure both have same currency.
-            throw new NotImplementedException();
+            EnsureSameCurrency(a,b);
+            return new Money(a.Amount - b.Amount, a.Currency);
         }
 
         public static Money operator *(Money a, int qty)
@@ -62,7 +67,7 @@ namespace DataAccess.ValueObject
             // TODO:
             // - Multiply Money by integer quantity.
             // - Return new Money instance.
-            throw new NotImplementedException();
+            return new Money(a.Amount * qty, a.Currency);
         }
 
         // Task – Currency Validation
@@ -70,7 +75,11 @@ namespace DataAccess.ValueObject
         {
             // TODO:
             // - Throw InvalidOperationException if currencies do not match.
-            throw new NotImplementedException();
+            if (a == null || b == null)
+                throw new InvalidOperationException("Cannot compare currency with null Money instance.");
+
+            if (!string.Equals(a.Currency, b.Currency, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Currencies must match to perform arithmetic operations.");
         }
 
         public bool Equals(Money? other)
@@ -79,13 +88,16 @@ namespace DataAccess.ValueObject
             // - Two Money objects are equal if:
             //      Amount is equal AND Currency is equal.
             // - Implement IEquatable<Money>.
-            throw new NotImplementedException();
+            if (other is null)
+                return false;
+
+            return Amount == other.Amount && string.Equals(Currency, other.Currency, StringComparison.OrdinalIgnoreCase);
         }
         public override int GetHashCode()
         {
             // TODO:
             // - Override GetHashCode using Amount and Currency.
-            throw new NotImplementedException();
+            return HashCode.Combine(Amount, Currency?.ToUpperInvariant());
         }
     }
 
@@ -97,7 +109,8 @@ namespace DataAccess.ValueObject
         // - Default currency = "INR".
         public static string FormatMoney(this decimal value, string currency = "INR")
         {
-            throw new NotImplementedException();
+            return new Money(value, currency).ToString();
         }
     }
 }
+

@@ -52,20 +52,20 @@ export async function loadSolutionWorkspace(assessmentKey = 'main-exam') {
   return loadWorkspace(assessmentKey, 'solution');
 }
 
-export async function runCode(files, assessmentKey = 'main-exam') {
-  return requestJson('/project/run', { files, assessmentKey });
+export async function runCode(files, assessmentKey = 'main-exam', mode = 'starter') {
+  return requestJson('/project/run', { files, assessmentKey, mode });
 }
 
-export async function runTests(files, assessmentKey = 'main-exam') {
-  return requestJson('/project/tests', { files, assessmentKey });
+export async function runTests(files, assessmentKey = 'main-exam', mode = 'starter') {
+  return requestJson('/project/tests', { files, assessmentKey, mode });
 }
 
-export async function buildAndRunTests(files, assessmentKey = 'main-exam') {
-  return requestJson('/project/build-and-test', { files, assessmentKey });
+export async function buildAndRunTests(files, assessmentKey = 'main-exam', mode = 'starter') {
+  return requestJson('/project/build-and-test', { files, assessmentKey, mode });
 }
 
-export async function submitSolution(files, assessmentKey = 'main-exam') {
-  return requestJson('/project/submit', { files, assessmentKey });
+export async function submitSolution(files, assessmentKey = 'main-exam', mode = 'starter') {
+  return requestJson('/project/submit', { files, assessmentKey, mode });
 }
 
 export async function buildUploadedZip(file) {

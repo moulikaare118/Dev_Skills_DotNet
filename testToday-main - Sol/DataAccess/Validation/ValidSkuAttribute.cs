@@ -26,7 +26,15 @@ namespace DataAccess.Validation
             // - Do NOT throw exceptions.
             // - Use Regex for validation.
 
-            throw new NotImplementedException();
+            var sku = value as string;
+            if (string.IsNullOrWhiteSpace(sku))
+                return new ValidationResult("SKU must be in format A123");
+
+            var regex = new Regex("^[A-Z][0-9]{3}$");
+            if (!regex.IsMatch(sku))
+                return new ValidationResult("SKU must be in format A123");
+
+            return ValidationResult.Success!;
         }
     }
 }

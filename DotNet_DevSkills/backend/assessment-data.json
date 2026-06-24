@@ -50,9 +50,9 @@
       {
         "key": "hon-orders",
         "label": "HON Orders Code",
-        "starterRoot": "HON.Orders",
-        "solutionRoot": "HON.Orders",
-        "solutionFile": "HON.Orders.sln"
+        "starterRoot": "testToday-main",
+        "solutionRoot": "testToday-main - Sol",
+        "solutionFile": "HONOrders.sln"
       }
     ]
   },

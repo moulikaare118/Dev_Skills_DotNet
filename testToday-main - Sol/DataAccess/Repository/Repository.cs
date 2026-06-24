@@ -36,6 +36,11 @@ namespace DataAccess.Repository
             _db.Add(entity);
         }
 
+        public void Remove(T entity)
+        {
+            _db.Remove(entity);
+        }
+
         public async Task SaveAsync()
         {
             await _context.SaveChangesAsync();

@@ -55,11 +55,30 @@ function getEditorTheme(theme) {
   return theme === 'dark' ? 'vs-dark' : 'vs-light';
 }
 
+function filterWarningsFromOutput(output) {
+  const lines = typeof output === 'string' ? output.split('\n') : output || [];
+  
+  return lines.filter(line => {
+    const trimmed = line.trim();
+    // Filter out NuGet warnings
+    if (trimmed.includes('warning NU') || trimmed.includes('warning:') || trimmed.includes(': warning ')) {
+      return false;
+    }
+    // Filter out "with X warning(s)" messages
+    if (trimmed.match(/with\s+\d+\s+warning\(s\)/i)) {
+      return false;
+    }
+    // Keep everything else
+    return true;
+  });
+}
+
 function formatConsoleOutput(response, mode) {
   const rawOutput = typeof response?.output === 'string' ? response.output.trim() : '';
 
   if (rawOutput && rawOutput !== DEFAULT_OUTPUT_PLACEHOLDER) {
-    return rawOutput.split('\n');
+    const filteredLines = filterWarningsFromOutput(rawOutput);
+    return filteredLines.length > 0 ? filteredLines : ['No significant output to display.'];
   }
 
   const label = mode === 'test' ? 'Test' : 'Build';
@@ -96,6 +115,21 @@ function extractFailureDetails(output) {
 
 function parseTestResults(output) {
   const lines = Array.isArray(output) ? output.join('\n') : output || '';
+  
+  // Try to match xUnit format: "Test summary: total: 17, failed: 0, succeeded: 17"
+  const xunitMatch = lines.match(/Test\s+summary:\s*total:\s*(\d+),\s*failed:\s*(\d+),\s*succeeded:\s*(\d+)/i);
+  if (xunitMatch) {
+    const total = parseInt(xunitMatch[1], 10);
+    const failed = parseInt(xunitMatch[2], 10);
+    const passed = parseInt(xunitMatch[3], 10);
+    return {
+      passed,
+      failed,
+      failures: failed > 0 ? extractFailureDetails(lines) : []
+    };
+  }
+  
+  // Fallback to old format matching
   const totalMatch = lines.match(/Total\s+tests:\s*(\d+)/i);
   const passedMatch = lines.match(/Passed:\s*(\d+)/i);
   const failedMatch = lines.match(/Failed:\s*(\d+)/i);
@@ -147,6 +181,7 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
   const unsavedChanges = useIDEStore((state) => state.unsavedChanges);
   const workspaceLoading = useIDEStore((state) => state.workspaceLoading);
   const workspaceError = useIDEStore((state) => state.workspaceError);
+  const workspaceMode = useIDEStore((state) => state.workspaceMode);
   const testResults = useIDEStore((state) => state.testSummary);
   const fullscreen = useIDEStore((state) => state.fullscreen);
   const [timeExpired, setTimeExpired] = useState(false);
@@ -232,7 +267,7 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
     setTestSummary({ total: 0, passed: 0, failed: 0, skipped: 0, duration: null });
 
     try {
-      const response = await buildAndRunTests(files, selectedAssessmentKey);
+      const response = await buildAndRunTests(files, selectedAssessmentKey, workspaceMode);
       const buildResult = response?.buildResult || response;
       const testResult = response?.testResult || null;
 
@@ -248,6 +283,11 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
           skipped: 0,
           duration: null
         });
+        
+        // Automatically switch to Test Results tab if there are test failures
+        if (parsedResults.failed > 0) {
+          setActiveOutputTab('tests');
+        }
       } else {
         setTestLines(['Tests were not run because the build failed.']);
         setTestSummary({ total: 0, passed: 0, failed: 0, skipped: 0, duration: null });
@@ -257,7 +297,7 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
       setTestLines(['Build and test execution failed.']);
       setTestSummary({ total: 0, passed: 0, failed: 0, skipped: 0, duration: null });
     }
-  }, [files, formatConsoleOutput, selectedAssessmentKey, setActiveOutputTab, setOutputLines, setTestLines, setTestSummary]);
+  }, [files, formatConsoleOutput, selectedAssessmentKey, workspaceMode, setActiveOutputTab, setOutputLines, setTestLines, setTestSummary]);
 
   const handleSubmit = useCallback(async () => {
     if (!selectedAssessmentKey) {
@@ -271,7 +311,7 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
     setSubmitted(true);
 
     try {
-      const response = await submitSolution(files, selectedAssessmentKey);
+      const response = await submitSolution(files, selectedAssessmentKey, workspaceMode);
       setSubmissionLines([
         `Status: ${response.status || 'Submitted'}`,
         `Passed: ${response.passed || 0}`,
@@ -285,7 +325,7 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
     } catch (error) {
       setSubmissionLines([`Error: ${error.message || error}`]);
     }
-  }, [files, selectedAssessmentKey, setActiveOutputTab, setSubmissionLines]);
+  }, [files, selectedAssessmentKey, workspaceMode, setActiveOutputTab, setSubmissionLines]);
 
   const handleGetSolution = useCallback(async () => {
     if (!selectedAssessmentKey) {

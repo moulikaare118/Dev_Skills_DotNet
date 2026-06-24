@@ -24,7 +24,9 @@ namespace DataAccess.Repository
             // - Return all orders placed on or after the given "since" date.
             // - Use EF Core async query.
             // - Results should be returned as a List<Order>.
-            throw new NotImplementedException();
+            return await _context.Orders
+                .Where(o => o.OrderDate >= since)
+                .ToListAsync();
         }
 
         //  Task 1.3 Async Stream
@@ -38,9 +40,31 @@ namespace DataAccess.Repository
             // - Stop when no more records exist.
             // - Respect the provided CancellationToken.
             // - Use yield return for streaming.
-            await Task.CompletedTask;
+            const int pageSize = 3;
+            var page = 0;
 
-            yield break; // temporary placeholder for compilation
+            while (true)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var batch = await _context.Orders
+                    .Where(o => o.OrderDate >= since)
+                    .OrderBy(o => o.Id)
+                    .Skip(page * pageSize)
+                    .Take(pageSize)
+                    .ToListAsync(ct);
+
+                if (!batch.Any())
+                    yield break;
+
+                foreach (var order in batch)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    yield return order;
+                }
+
+                page++;
+            }
         }
 
 
@@ -56,7 +80,21 @@ namespace DataAccess.Repository
             // - Sort by Revenue descending.
             // - Use LINQ GroupBy and projection to TopCustomerDTO.
             // - Execute query asynchronously.
-            throw new NotImplementedException();
+            var cutoff = DateTime.UtcNow.AddDays(-30);
+
+            return await _context.Orders
+                .Where(o => o.OrderDate >= cutoff)
+                .Include(o => o.Customer)
+                .GroupBy(o => new { o.CustomerId, o.Customer.Name })
+                .Select(g => new TopCustomerDTO
+                {
+                    CustomerName = g.Key.Name,
+                    OrdersCount = g.Select(x => x.Id).Distinct().Count(),
+                    Revenue = g.Sum(x => x.Total)
+                })
+                .OrderByDescending(x => x.Revenue)
+                .Take(5)
+                .ToListAsync();
         }
 
         //Task 1.4 — Dynamic Predicate(Expression Trees)
@@ -67,7 +105,11 @@ namespace DataAccess.Repository
             // - Include Customer navigation property.
             // - Apply dynamic filtering using Where(predicate).
             // - Execute asynchronously and return filtered list.
-            throw new NotImplementedException();
+            var predicate = OrderPredicateBuilder.Build(status, from, to, minTotal, email);
+            return await _context.Orders
+                .Include(o => o.Customer)
+                .Where(predicate)
+                .ToListAsync();
         }
     }
 }

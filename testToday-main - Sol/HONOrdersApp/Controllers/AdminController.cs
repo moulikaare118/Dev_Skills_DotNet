@@ -112,7 +112,9 @@ namespace HONOrdersApp.Controllers
                 return NotFound();
 
             // TODO: Implement delete logic
-            // For now, we'll just mark as deleted or remove
+            // For now, we'll just remove the product.
+            _productRepo.Remove(product);
+            await _productRepo.SaveAsync();
 
             TempData["SuccessMessage"] = $"Product '{product.Name}' deleted successfully.";
             return RedirectToAction(nameof(Products));

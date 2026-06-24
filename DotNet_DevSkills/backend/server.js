@@ -23,8 +23,8 @@ const fallbackCodeEditorAssessments = [
   {
     key: 'hon-orders',
     label: 'HON Orders Code',
-    starterRoot: 'HON.Orders',
-    solutionRoot: 'HON.Orders',
+    starterRoot: 'testToday-main',
+    solutionRoot: 'testToday-main - Sol',
     solutionFile: 'HON.Orders.sln'
   }
 ];
@@ -1557,13 +1557,14 @@ function formatDotnetResult(result, command, mode) {
 async function createProjectWorkspace(files = [], templateRoot) {
   await ensureProjectRoot(templateRoot, 'project');
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'devskills-dotnet-'));
-  const projectRoot = path.join(tempRoot, 'MainExam');
+  const projectName = path.basename(templateRoot);
+  const projectRoot = path.join(tempRoot, projectName);
   await copyDirectory(templateRoot, projectRoot);
   await writeSnapshotFiles(projectRoot, files);
   return { tempRoot, projectRoot };
 }
 
-async function getAssessmentExecutionConfig(assessmentKey) {
+async function getAssessmentExecutionConfig(assessmentKey, workspaceMode = 'starter') {
   const data = await loadAssessmentData();
   const codeEditorConfig = normalizeCodeEditorConfig(data);
   const assessmentConfig = resolveAssessmentConfig(codeEditorConfig, assessmentKey);
@@ -1574,6 +1575,8 @@ async function getAssessmentExecutionConfig(assessmentKey) {
 
   const starterRootName = assessmentConfig.starterRoot || assessmentConfig.solutionRoot;
   const solutionRootName = assessmentConfig.solutionRoot || assessmentConfig.starterRoot;
+  const selectedRootName = workspaceMode === 'solution' ? solutionRootName : starterRootName;
+  
   const solutionFile = resolveAssessmentSolutionFile(assessmentConfig)
     || assessmentConfig.solutionFile
     || await findSolutionFile(path.join(workspaceRoot, starterRootName)).catch(() => null)
@@ -1588,16 +1591,17 @@ async function getAssessmentExecutionConfig(assessmentKey) {
     assessmentConfig,
     starterRoot: path.join(workspaceRoot, starterRootName),
     solutionRoot: path.join(workspaceRoot, solutionRootName),
+    projectRoot: path.join(workspaceRoot, selectedRootName),
     solutionFile
   };
 }
 
-async function evaluateProjectBuildAndTest(files, assessmentKey) {
-  const { starterRoot, solutionFile } = await getAssessmentExecutionConfig(assessmentKey);
-  const { tempRoot, projectRoot } = await createProjectWorkspace(files, starterRoot);
+async function evaluateProjectBuildAndTest(files, assessmentKey, workspaceMode = 'starter') {
+  const { projectRoot, solutionFile } = await getAssessmentExecutionConfig(assessmentKey, workspaceMode);
+  const { tempRoot, projectRoot: tempProjectRoot } = await createProjectWorkspace(files, projectRoot);
   try {
     const buildCommand = ['build', solutionFile];
-    const buildResult = await runCommand('dotnet', buildCommand, projectRoot);
+    const buildResult = await runCommand('dotnet', buildCommand, tempProjectRoot);
     const buildOutput = formatDotnetResult(buildResult, buildCommand, 'build');
 
     if (buildResult.code !== 0) {
@@ -1611,12 +1615,12 @@ async function evaluateProjectBuildAndTest(files, assessmentKey) {
           output: buildOutput
         },
         testResult: null,
-        workspaceRoot: projectRoot
+        workspaceRoot: tempProjectRoot
       };
     }
 
     const testCommand = ['test', solutionFile, '-v', 'normal', '--logger', 'console;verbosity=normal'];
-    const testResult = await runCommand('dotnet', testCommand, projectRoot);
+    const testResult = await runCommand('dotnet', testCommand, tempProjectRoot);
     const testOutput = formatDotnetResult(testResult, testCommand, 'test');
 
     return {
@@ -1633,7 +1637,7 @@ async function evaluateProjectBuildAndTest(files, assessmentKey) {
         exitCode: testResult.code,
         output: testOutput
       },
-      workspaceRoot: projectRoot
+      workspaceRoot: tempProjectRoot
     };
   } finally {
     await fs.rm(tempRoot, { recursive: true, force: true });
@@ -1763,28 +1767,28 @@ function parseTestOutput(output) {
   return { summary, testCases };
 }
 
-async function evaluateProject(files, mode, assessmentKey) {
-  const { starterRoot, solutionFile } = await getAssessmentExecutionConfig(assessmentKey);
-  const { tempRoot, projectRoot } = await createProjectWorkspace(files, starterRoot);
+async function evaluateProject(files, evalMode, assessmentKey, workspaceMode = 'starter') {
+  const { projectRoot, solutionFile } = await getAssessmentExecutionConfig(assessmentKey, workspaceMode);
+  const { tempRoot, projectRoot: tempProjectRoot } = await createProjectWorkspace(files, projectRoot);
   try {
-    const command = mode === 'test'
+    const command = evalMode === 'test'
       ? ['test', solutionFile, '-v', 'normal', '--logger', 'console;verbosity=normal']
       : ['build', solutionFile];
-    const result = await runCommand('dotnet', command, projectRoot);
+    const result = await runCommand('dotnet', command, tempProjectRoot);
     const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
     const finalOutput = output || [
       `dotnet ${command.join(' ')}`,
-      result.code === 0 ? `${mode === 'test' ? 'Test run completed successfully.' : 'Build completed successfully.'}` : `${mode === 'test' ? 'Test run failed.' : 'Build failed.'}`,
+      result.code === 0 ? `${evalMode === 'test' ? 'Test run completed successfully.' : 'Build completed successfully.'}` : `${evalMode === 'test' ? 'Test run failed.' : 'Build failed.'}`,
       'No console output was produced by dotnet.'
     ].join('\n');
     const response = {
       success: result.code === 0,
       exitCode: result.code,
       output: finalOutput,
-      workspaceRoot: projectRoot
+      workspaceRoot: tempProjectRoot
     };
 
-    if (mode === 'test') {
+    if (evalMode === 'test') {
       const { summary, testCases } = parseTestOutput(finalOutput);
       response.testSummary = summary;
       response.testCases = testCases;
@@ -1881,28 +1885,28 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && url.pathname === '/api/project/run') {
       const body = await readJsonBody(req);
-      const result = await evaluateProject(body.files || [], 'build', body.assessmentKey);
+      const result = await evaluateProject(body.files || [], 'build', body.assessmentKey, body.mode);
       jsonResponse(res, 200, result);
       return;
     }
 
     if (req.method === 'POST' && url.pathname === '/api/project/tests') {
       const body = await readJsonBody(req);
-      const result = await evaluateProject(body.files || [], 'test', body.assessmentKey);
+      const result = await evaluateProject(body.files || [], 'test', body.assessmentKey, body.mode);
       jsonResponse(res, 200, result);
       return;
     }
 
     if (req.method === 'POST' && url.pathname === '/api/project/build-and-test') {
       const body = await readJsonBody(req);
-      const result = await evaluateProjectBuildAndTest(body.files || [], body.assessmentKey);
+      const result = await evaluateProjectBuildAndTest(body.files || [], body.assessmentKey, body.mode);
       jsonResponse(res, 200, result);
       return;
     }
 
     if (req.method === 'POST' && url.pathname === '/api/project/submit') {
       const body = await readJsonBody(req);
-      const result = await evaluateProject(body.files || [], 'test', body.assessmentKey);
+      const result = await evaluateProject(body.files || [], 'test', body.assessmentKey, body.mode);
       jsonResponse(res, 200, {
         ...result,
         status: result.success ? 'Submitted' : 'Blocked'

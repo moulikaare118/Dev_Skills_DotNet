@@ -13,6 +13,7 @@ namespace DataAccess.Repository
         Task<T?> GetAsync(int id);
         Task<List<T>> GetAllAsync();
         Task AddAsync(T entity);
+        void Remove(T entity);
         Task SaveAsync();
     }
 }
