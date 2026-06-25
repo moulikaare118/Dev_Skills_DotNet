@@ -16,15 +16,19 @@ const fallbackCodeEditorAssessments = [
   {
     key: 'main-exam',
     label: 'Main Exam Code',
-    starterRoot: 'dist/MainCode',
-    solutionRoot: 'dist/MainCode-Sol',
+    starterRoot: 'public/MainCode',
+    starterZip: 'MainCode.zip',
+    solutionRoot: 'public/MainCode-Sol',
+    solutionZip: 'MainCode-Sol.zip',
     solutionFile: 'HON.Academy.sln'
   },
   {
     key: 'hon-orders',
     label: 'HON Orders Code',
-    starterRoot: 'dist/testToday-main',
-    solutionRoot: 'dist/testToday-main-Sol',
+    starterRoot: 'public/testToday-main',
+    starterZip: 'testToday-main.zip',
+    solutionRoot: 'public/testToday-main-Sol',
+    solutionZip: 'testToday-main - Sol.zip',
     solutionFile: 'HONOrders.sln'
   }
 ];
@@ -1515,17 +1519,94 @@ async function findSolutionFile(rootDir) {
   return null;
 }
 
+async function findAllSolutionFiles(rootDir) {
+  const results = [];
+  const entries = await fs.readdir(rootDir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const entryPath = path.join(rootDir, entry.name);
+    if (entry.isFile() && entry.name.endsWith('.sln')) {
+      results.push(entryPath);
+      continue;
+    }
+    if (entry.isDirectory()) {
+      results.push(...await findAllSolutionFiles(entryPath).catch(() => []));
+    }
+  }
+
+  return results;
+}
+
+async function parseSolutionProjectReferences(solutionFilePath) {
+  const content = await fs.readFile(solutionFilePath, 'utf8');
+  const references = [];
+  const projectEntryRegex = /Project\(".*?"\)\s*=\s*".*?"\s*,\s*"(.*?)"\s*,/g;
+  let match;
+
+  while ((match = projectEntryRegex.exec(content)) !== null) {
+    references.push(match[1]);
+  }
+
+  return references;
+}
+
+async function findBestSolutionFile(rootDir) {
+  const solutionFiles = await findAllSolutionFiles(rootDir);
+  if (!solutionFiles.length) {
+    return null;
+  }
+
+  if (solutionFiles.length === 1) {
+    return solutionFiles[0];
+  }
+
+  let bestSolution = solutionFiles[0];
+  let bestScore = -Infinity;
+
+  for (const solutionFile of solutionFiles) {
+    const references = await parseSolutionProjectReferences(solutionFile).catch(() => []);
+    let score = 0;
+    const solutionDir = path.dirname(solutionFile);
+
+    for (const reference of references) {
+      const projectPath = path.resolve(solutionDir, reference.replace(/\\/g, path.sep));
+      if (await fileExists(projectPath)) {
+        score += 1;
+      }
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestSolution = solutionFile;
+    }
+  }
+
+  return bestSolution;
+}
+
 async function findTestProject(rootDir) {
   const entries = await fs.readdir(rootDir, { withFileTypes: true });
 
-  // First pass: look for .Tests.csproj files at current level
+  // First pass: look for exact .Tests.csproj files at current level
   for (const entry of entries) {
-    if (entry.isFile() && entry.name.endsWith('.Tests.csproj')) {
+    if (entry.isFile() && entry.name.toLowerCase().endsWith('.tests.csproj')) {
       return path.join(rootDir, entry.name);
     }
   }
 
-  // Second pass: recurse into directories
+  // Second pass: look for any test-like csproj file names at current level
+  for (const entry of entries) {
+    if (!entry.isFile()) {
+      continue;
+    }
+
+    const name = entry.name.toLowerCase();
+    if (name.endsWith('.csproj') && /(test|xunit)/.test(name)) {
+      return path.join(rootDir, entry.name);
+    }
+  }
+
+  // Third pass: recurse into directories
   for (const entry of entries) {
     if (!entry.isDirectory()) {
       continue;
@@ -1641,37 +1722,18 @@ async function evaluateProjectBuildAndTest(files, assessmentKey, workspaceMode =
   const { projectRoot, solutionFile } = await getAssessmentExecutionConfig(assessmentKey, workspaceMode);
   const { tempRoot, projectRoot: tempProjectRoot } = await createProjectWorkspace(files, projectRoot);
   try {
-    const buildCommand = ['build', solutionFile];
-    const buildResult = await runCommand('dotnet', buildCommand, tempProjectRoot);
-    const buildOutput = formatDotnetResult(buildResult, buildCommand, 'build');
-
-    if (buildResult.code !== 0) {
-      return {
-        success: false,
-        exitCode: buildResult.code,
-        output: buildOutput,
-        buildResult: {
-          success: false,
-          exitCode: buildResult.code,
-          output: buildOutput
-        },
-        testResult: null,
-        workspaceRoot: tempProjectRoot
-      };
-    }
-
-    const testCommand = ['test', solutionFile, '-v', 'normal', '--logger', 'console;verbosity=normal'];
+    const testCommand = ['test', solutionFile, '--logger', 'console;verbosity=minimal'];
     const testResult = await runCommand('dotnet', testCommand, tempProjectRoot);
     const testOutput = formatDotnetResult(testResult, testCommand, 'test');
 
     return {
       success: testResult.code === 0,
       exitCode: testResult.code,
-      output: [buildOutput, testOutput].filter(Boolean).join('\n\n'),
+      output: testOutput,
       buildResult: {
-        success: true,
-        exitCode: buildResult.code,
-        output: buildOutput
+        success: testResult.code === 0,
+        exitCode: testResult.code,
+        output: testOutput
       },
       testResult: {
         success: testResult.code === 0,
@@ -1853,22 +1915,31 @@ async function evaluateZip(zipBase64, mode) {
   await fs.writeFile(zipPath, Buffer.from(zipBase64, 'base64'));
   await unzipArchive(zipPath, extractRoot);
 
-  const solutionRoot = (await findSolutionRoot(extractRoot)) || extractRoot;
+  const solutionRoot = extractRoot;
+  const bestSolutionFile = await findBestSolutionFile(extractRoot);
+  const commandCwd = bestSolutionFile ? path.dirname(bestSolutionFile) : solutionRoot;
   try {
     let command;
     if (mode === 'test') {
-      // Dynamically find the test project
-      const testProjectPath = await findTestProject(solutionRoot);
-      if (!testProjectPath) {
-        throw new Error('No test project (.Tests.csproj) found in the uploaded solution.');
+      if (bestSolutionFile) {
+        command = ['test', path.basename(bestSolutionFile), '--verbosity', 'normal'];
+      } else {
+        // Dynamically find the test project
+        const testProjectPath = await findTestProject(solutionRoot);
+        if (!testProjectPath) {
+          throw new Error('No test project (.csproj) found in the uploaded solution.');
+        }
+        const relativeTestPath = path.relative(solutionRoot, testProjectPath);
+        command = ['test', relativeTestPath, '--verbosity', 'normal'];
       }
-      // Make path relative to solutionRoot for dotnet CLI
-      const relativeTestPath = path.relative(solutionRoot, testProjectPath);
-      command = ['test', relativeTestPath, '--verbosity', 'normal'];
     } else {
-      command = ['build'];
+      if (bestSolutionFile) {
+        command = ['build', path.basename(bestSolutionFile)];
+      } else {
+        command = ['build'];
+      }
     }
-    const result = await runCommand('dotnet', command, solutionRoot);
+    const result = await runCommand('dotnet', command, commandCwd);
     const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
     const finalOutput = output || [
       `dotnet ${command.join(' ')}`,

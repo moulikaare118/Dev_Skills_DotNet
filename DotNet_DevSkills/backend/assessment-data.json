@@ -43,15 +43,19 @@
       {
         "key": "main-exam",
         "label": "Main Exam Code",
-        "starterRoot": "dist/MainCode",
-        "solutionRoot": "dist/MainCode-Sol",
+        "starterRoot": "public/MainCode",
+        "starterZip": "MainCode.zip",
+        "solutionRoot": "public/MainCode-Sol",
+        "solutionZip": "MainCode-Sol.zip",
         "solutionFile": "HON.Academy.sln"
       },
       {
         "key": "hon-orders",
         "label": "HON Orders Code",
-        "starterRoot": "dist/testToday-main",
-        "solutionRoot": "dist/testToday-main - Sol",
+        "starterRoot": "public/testToday-main",
+        "starterZip": "testToday-main.zip",
+        "solutionRoot": "public/testToday-main-Sol",
+        "solutionZip": "testToday-main - Sol.zip",
         "solutionFile": "HONOrders.sln"
       }
     ]

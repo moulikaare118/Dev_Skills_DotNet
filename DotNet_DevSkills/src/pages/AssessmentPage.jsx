@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import Timer from '../components/Timer';
 import UploadSection from '../components/UploadSection';
-import BuildAndTestPanel from '../components/BuildAndTestPanel';
 import TimeExpiredModal from '../components/TimeExpiredModal';
 import SubmissionRecordedModal from '../components/SubmissionRecordedModal';
 import ThemeToggle from '../components/ThemeToggle';
@@ -11,9 +10,12 @@ import { useNavigate } from 'react-router-dom';
 export default function AssessmentPage({ theme, onToggleTheme }) {
   const [uploadedFile, setUploadedFile] = useState(null);
   const [timeExpired, setTimeExpired] = useState(false);
+  const [timerActive, setTimerActive] = useState(true);
   const [submitted, setSubmitted] = useState(false);
+  const [solutionUnlocked, setSolutionUnlocked] = useState(false);
   const [showSubmissionModal, setShowSubmissionModal] = useState(false);
-  const [selectedStarter, setSelectedStarter] = useState('maincode');
+  const [selectedAssessmentKey, setSelectedAssessmentKey] = useState('main-exam');
+  const [starterDownloaded, setStarterDownloaded] = useState(false);
   const [assessmentMeta, setAssessmentMeta] = useState(null);
   const navigate = useNavigate();
 
@@ -22,8 +24,16 @@ export default function AssessmentPage({ theme, onToggleTheme }) {
   }, []);
 
   useEffect(() => {
+    if (assessmentMeta?.codeEditor?.defaultAssessmentKey) {
+      setSelectedAssessmentKey(assessmentMeta.codeEditor.defaultAssessmentKey);
+    }
+  }, [assessmentMeta]);
+
+  useEffect(() => {
     if (timeExpired) {
       setSubmitted(true);
+      setSolutionUnlocked(true);
+      setTimerActive(false);
     }
   }, [timeExpired]);
 
@@ -31,19 +41,56 @@ export default function AssessmentPage({ theme, onToggleTheme }) {
 
   const handleSubmit = () => {
     setSubmitted(true);
+    setSolutionUnlocked(true);
+    setTimerActive(false);
     window.localStorage.removeItem('devskills-assessment-timer');
     setShowSubmissionModal(true);
   };
 
-  const handleGetSolution = () => {
-    if (timeExpired) {
-      window.alert('Time is up. Solution access is now available.');
+  const getAssessmentConfig = (assessmentKey) => {
+    return assessmentMeta?.codeEditor?.assessments?.find((assessment) => assessment.key === assessmentKey) || null;
+  };
+
+  const getZipPath = (assessmentKey, type) => {
+    const assessment = getAssessmentConfig(assessmentKey);
+    if (!assessment) {
+      return null;
     }
+
+    const fileName = type === 'starter' ? assessment.starterZip : assessment.solutionZip;
+    return fileName ? `/${fileName}` : null;
+  };
+
+  const downloadSolutionZip = (url) => {
+    if (!url) {
+      return;
+    }
+
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = '';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+  };
+
+  const handleGetSolution = () => {
+    if (!solutionUnlocked && !timeExpired) {
+      return;
+    }
+
+    const solutionZipPath = getZipPath(selectedAssessmentKey, 'solution');
+
+    if (!solutionZipPath) {
+      window.alert('Solution download is not available for this assessment.');
+      return;
+    }
+
+    downloadSolutionZip(solutionZipPath);
   };
 
   const handleSubmissionModalClose = () => {
     setShowSubmissionModal(false);
-    navigate('/');
   };
 
   const fileName = useMemo(() => uploadedFile?.name || 'No file uploaded yet.', [uploadedFile]);
@@ -67,7 +114,7 @@ export default function AssessmentPage({ theme, onToggleTheme }) {
             <div className="rounded-3xl bg-slate-50 dark:bg-slate-800 px-5 py-4 text-slate-900 dark:text-slate-100 shadow-sm ring-1 ring-slate-200 dark:ring-slate-700">
               <p className="text-sm text-slate-500 dark:text-slate-400">Time Remaining</p>
               <div className="mt-1 flex items-center gap-2">
-                <Timer active={!submitted && !timeExpired && !uploadedFile} onExpire={() => setTimeExpired(true)} />
+                <Timer active={timerActive && !timeExpired} onExpire={() => setTimeExpired(true)} />
               </div>
             </div>
             <ThemeToggle theme={theme} onToggleTheme={onToggleTheme} />
@@ -143,16 +190,21 @@ export default function AssessmentPage({ theme, onToggleTheme }) {
               </div>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <select
-                  value={selectedStarter}
-                  onChange={(event) => setSelectedStarter(event.target.value)}
+                  value={selectedAssessmentKey}
+                  onChange={(event) => {
+                    setSelectedAssessmentKey(event.target.value);
+                    setStarterDownloaded(false);
+                  }}
                   className="rounded-3xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm focus:border-slate-900 focus:outline-none"
                 >
-                  <option value="maincode">MainCode</option>
-                  <option value="testtodaymain">TestTodayMain</option>
+                  {(assessmentMeta?.codeEditor?.assessments || []).map((assessment) => (
+                    <option key={assessment.key} value={assessment.key}>{assessment.label}</option>
+                  ))}
                 </select>
                 <a
-                  href={selectedStarter === 'testtodaymain' ? '/testTodayMain.zip' : '/MainCode.zip'}
+                  href={getZipPath(selectedAssessmentKey, 'starter') || '#'}
                   download
+                  onClick={() => setStarterDownloaded(true)}
                   className="inline-flex items-center justify-center rounded-3xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
                 >
                   Download Starter Code
@@ -161,14 +213,34 @@ export default function AssessmentPage({ theme, onToggleTheme }) {
             </div>
           </div>
 
-          <UploadSection onFileUploaded={setUploadedFile} disabled={submitted || timeExpired} />
+          <UploadSection onFileUploaded={setUploadedFile} disabled={submitted || timeExpired || !starterDownloaded} />
+          {!starterDownloaded ? (
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              Download the starter code first to enable ZIP upload.
+            </div>
+          ) : null}
 
-          <BuildAndTestPanel uploadedFile={uploadedFile} disabled={submitted || timeExpired} />
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Solution Download</h2>
+                <p className="mt-2 text-sm text-slate-600">Once you click Finish, the timer stops and Get Solution becomes available. After that, click Get Solution to download the solution ZIP for the selected assessment.</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleGetSolution}
+                disabled={!solutionUnlocked && !timeExpired}
+                className="inline-flex items-center justify-center rounded-3xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
+              >
+                Get Solution
+              </button>
+            </div>
+          </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <p className="text-sm text-slate-600">Latest uploaded file: <span className="font-semibold text-slate-900">{fileName}</span></p>
             {submitted ? <p className="mt-3 text-sm text-emerald-700">Submission has been recorded.</p> : null}
-            {timeExpired ? <p className="mt-3 text-sm text-rose-700">Time has expired. Upload and build actions are disabled.</p> : null}
+            {timeExpired ? <p className="mt-3 text-sm text-rose-700">Time has expired. Upload and Get Solution actions are disabled.</p> : null}
           </div>
         </section>
       </div>

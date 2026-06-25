@@ -209,6 +209,16 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
     () => assessmentOptions.find((assessment) => assessment.key === selectedAssessmentKey) || null,
     [assessmentOptions, selectedAssessmentKey]
   );
+  const todoFiles = useMemo(() => {
+    if (!selectedAssessmentKey || !Array.isArray(files) || files.length === 0) {
+      return [];
+    }
+
+    return files
+      .filter((file) => typeof file.content === 'string' && /todo/i.test(file.content))
+      .map((file) => file.path || file.name || file.id)
+      .filter((value, index, self) => value && self.indexOf(value) === index);
+  }, [files, selectedAssessmentKey]);
   const editorTheme = theme === 'dark' ? 'vs-dark' : 'vs-light';
 
   const activeProblemMeta = useMemo(() => {
@@ -282,6 +292,15 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
 
     loadWorkspace({ assessmentKey: selectedAssessmentKey, mode: 'starter' });
   }, [loadWorkspace, selectedAssessmentKey]);
+
+  useEffect(() => {
+    if (!timeExpired) {
+      return;
+    }
+
+    setSolutionUnlocked(true);
+    window.alert('Time is up. Submission is closed, and solution access is now enabled.');
+  }, [timeExpired]);
 
   const handleBuildAndRunTests = useCallback(async () => {
     if (!selectedAssessmentKey) {
@@ -492,7 +511,7 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
           <div className="flex items-center gap-4">
             <div className="rounded-3xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm">
               <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Time Remaining</p>
-              <Timer active={!timeExpired && !submitted} onExpire={() => setTimeExpired(true)} resetSignal={timerResetSignal} />
+              <Timer active={timerStarted && !timeExpired && !submitted} onExpire={() => setTimeExpired(true)} resetSignal={timerResetSignal} />
             </div>
             {/* <div className="rounded-3xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm">Candidate: Alex</div> */}
             <ThemeToggle theme={theme} onToggleTheme={onToggleTheme} />
@@ -511,6 +530,18 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
                 onSave={saveChanges}
                 onRefresh={refreshFiles}
               />
+            </div>
+            <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-900">Files with TODOs</h3>
+              {todoFiles.length > 0 ? (
+                <ul className="mt-3 space-y-2 text-sm text-slate-600">
+                  {todoFiles.map((filePath) => (
+                    <li key={filePath} className="break-words">{filePath}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-3 text-sm text-slate-400">No TODO files found for the selected assessment.</p>
+              )}
             </div>
             {/* <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between gap-4">
@@ -555,7 +586,7 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
                   </label>
                   <div className="flex flex-wrap items-center gap-2">
                   <button onClick={handleBuildAndRunTests} className="inline-flex items-center gap-2 rounded-3xl bg-[#84BD00] px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-emerald-500">Build & Run Tests</button>
-                  <button onClick={handleSubmit} className="inline-flex items-center gap-2 rounded-3xl bg-sky-500 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-sky-400">Submit</button>
+                  <button onClick={handleSubmit} disabled={submitted || timeExpired} className="inline-flex items-center gap-2 rounded-3xl bg-sky-500 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400">Submit</button>
                   <button onClick={handleGetSolution} disabled={!submitted && !solutionUnlocked} className="inline-flex items-center gap-2 rounded-3xl bg-slate-800 px-3 py-2 text-xs font-semibold text-white transition disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 hover:bg-slate-700">Get Solution</button>
                   <button onClick={resetEditor} disabled={submitted} className="inline-flex items-center gap-2 rounded-3xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400">Reset</button>
                   </div>
