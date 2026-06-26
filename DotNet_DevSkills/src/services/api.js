@@ -1,4 +1,4 @@
-const API_BASE = 'api';
+const API_BASE = './api';
 
 async function requestJson(path, payload) {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -16,7 +16,7 @@ async function requestJson(path, payload) {
 }
 
 async function fetchJson(path) {
-  const response = await fetch(path);
+  const response = await fetch(new URL(path, document.baseURI).href);
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(errorText || 'Failed to fetch JSON');
