@@ -1,4 +1,4 @@
-const API_BASE = '/api';
+const API_BASE = 'api';
 
 async function requestJson(path, payload) {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -13,6 +13,19 @@ async function requestJson(path, payload) {
   }
 
   return response.json();
+}
+
+async function fetchJson(path) {
+  const response = await fetch(path);
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'Failed to fetch JSON');
+  }
+  return response.json();
+}
+
+export async function loadAssessmentMetaFallback() {
+  return fetchJson('assessment-data.json');
 }
 
 export async function loadWorkspace(assessmentKey = 'main-exam', mode = 'starter') {
@@ -39,13 +52,11 @@ export async function loadWorkspace(assessmentKey = 'main-exam', mode = 'starter
 }
 
 export async function loadAssessmentMeta() {
-  const response = await fetch(`${API_BASE}/assessment/meta`);
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || 'Failed to load assessment metadata');
+  try {
+    return await fetchJson(`${API_BASE}/assessment/meta`);
+  } catch (error) {
+    return loadAssessmentMetaFallback();
   }
-
-  return response.json();
 }
 
 export async function loadSolutionWorkspace(assessmentKey = 'main-exam') {

@@ -1,0 +1,15 @@
+/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagement.DAL/bin/Debug/net8.0/DataAccess.deps.json
+/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagement.DAL/bin/Debug/net8.0/DataAccess.runtimeconfig.json
+/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagement.DAL/bin/Debug/net8.0/DataAccess.dll
+/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagement.DAL/bin/Debug/net8.0/DataAccess.pdb
+/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagement.DAL/obj/Debug/net8.0/DataAccess.csproj.AssemblyReference.cache
+/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagement.DAL/obj/Debug/net8.0/DataAccess.GeneratedMSBuildEditorConfig.editorconfig
+/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagement.DAL/obj/Debug/net8.0/DataAccess.AssemblyInfoInputs.cache
+/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagement.DAL/obj/Debug/net8.0/DataAccess.AssemblyInfo.cs
+/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagement.DAL/obj/Debug/net8.0/DataAccess.csproj.CoreCompileInputs.cache
+/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagement.DAL/obj/Debug/net8.0/DataAccess.sourcelink.json
+/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagement.DAL/obj/Debug/net8.0/DataAccess.dll
+/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagement.DAL/obj/Debug/net8.0/refint/DataAccess.dll
+/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagement.DAL/obj/Debug/net8.0/DataAccess.pdb
+/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagement.DAL/obj/Debug/net8.0/DataAccess.genruntimeconfig.cache
+/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagement.DAL/obj/Debug/net8.0/ref/DataAccess.dll

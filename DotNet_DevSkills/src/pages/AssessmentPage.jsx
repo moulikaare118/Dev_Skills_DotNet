@@ -58,7 +58,12 @@ export default function AssessmentPage({ theme, onToggleTheme }) {
     }
 
     const fileName = type === 'starter' ? assessment.starterZip : assessment.solutionZip;
-    return fileName ? `/${fileName}` : null;
+    if (!fileName) {
+      return null;
+    }
+
+    const baseHref = document.querySelector('base')?.href || window.location.href;
+    return new URL(fileName, baseHref).href;
   };
 
   const downloadSolutionZip = (url) => {

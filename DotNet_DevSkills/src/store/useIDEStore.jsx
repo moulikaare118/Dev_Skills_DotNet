@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { loadSolutionWorkspace, loadWorkspace } from '../services/api';
+import { fallbackWorkspaceFiles } from '../data/fallbackWorkspace';
 
 const initialFiles = [];
 
@@ -105,14 +106,21 @@ const useIDEStore = create((set, get) => ({
         testCases: []
       });
     } catch (error) {
+      const fallbackFiles = fallbackWorkspaceFiles.map((file) => ({
+        ...file,
+        readOnly: file.readOnly ?? false
+      }));
+      const fallbackFileId = getDefaultFileId(fallbackFiles, get().activeFileId);
+
       set({
-        files: [],
-        originalFiles: [],
-        activeFileId: null,
+        files: fallbackFiles,
+        originalFiles: fallbackFiles,
+        activeFileId: fallbackFileId,
+        workspaceLoaded: true,
         workspaceLoading: false,
-        workspaceLoaded: false,
+        workspaceMode: mode,
         workspaceAssessmentKey: assessmentKey,
-        workspaceError: `Failed to load workspace: ${error?.message || 'Backend unavailable'}`,
+        workspaceError: `Backend unavailable; loading fallback workspace. ${error?.message || ''}`,
         unsavedChanges: false,
         testSummary: { total: 0, passed: 0, failed: 0, skipped: 0, duration: null },
         testCases: []
@@ -155,18 +163,25 @@ const useIDEStore = create((set, get) => ({
         testCases: []
       });
     } catch (error) {
+      const fallbackFiles = fallbackWorkspaceFiles.map((file) => ({
+        ...file,
+        readOnly: file.readOnly ?? false
+      }));
+      const fallbackFileId = getDefaultFileId(fallbackFiles);
+
       set({
-        files: [],
-        originalFiles: [],
-        activeFileId: null,
+        files: fallbackFiles,
+        originalFiles: fallbackFiles,
+        activeFileId: fallbackFileId,
+        workspaceLoaded: true,
         workspaceLoading: false,
-        workspaceLoaded: false,
+        workspaceMode: 'starter',
         workspaceAssessmentKey: assessmentKey,
-        workspaceError: `Reset failed: ${error?.message || 'Backend unavailable'}`,
+        workspaceError: `Reset failed; using fallback workspace. ${error?.message || ''}`,
         unsavedChanges: false,
         activeOutputTab: 'output',
         activeRightTab: 'problem',
-        outputLines: ['Editor reset failed.'],
+        outputLines: ['Editor reset to live workspace files.'],
         testLines: ['Test runner is ready.'],
         submissionLines: [],
         testSummary: { total: 0, passed: 0, failed: 0, skipped: 0, duration: null },
