@@ -6,7 +6,7 @@ import AssessmentDetails from '../components/AssessmentDetails';
 import ConsolePanel from '../components/ConsolePanel';
 import Timer from '../components/Timer';
 import useIDEStore from '../store/useIDEStore';
-import { buildAndRunTests, loadAssessmentMeta, submitSolution } from '../services/api';
+import { loadAssessmentMeta } from '../services/api';
 
 const problemMeta = {
   title: 'MainCode-Sol: E-Learning Platform',
@@ -303,133 +303,23 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
   }, [timeExpired]);
 
   const handleBuildAndRunTests = useCallback(async () => {
-    if (!selectedAssessmentKey) {
-      setOutputLines(['Select an assessment type to load code before running tests.']);
-      setTestLines(['Select an assessment type to load code before running tests.']);
-      return;
-    }
-
     setActiveOutputTab('output');
-    setOutputLines(['Building project and running tests...']);
-    setTestLines(['Building project and running tests...']);
+    setOutputLines(['Build & Run Tests is unavailable in static mode.']);
+    setTestLines(['Build & Run Tests is unavailable in static mode.']);
     setTestSummary({ total: 0, passed: 0, failed: 0, skipped: 0, duration: null });
-
-    try {
-      const response = await buildAndRunTests(files, selectedAssessmentKey, workspaceMode);
-      const buildResult = response?.buildResult || response;
-      const testResult = response?.testResult || null;
-
-      setOutputLines(formatConsoleOutput(buildResult, 'build'));
-
-      if (testResult) {
-        setTestLines(formatConsoleOutput(testResult, 'test'));
-        const parsedResults = parseTestResults(testResult.output || response?.output || '');
-        setTestSummary({
-          total: parsedResults.passed + parsedResults.failed,
-          passed: parsedResults.passed,
-          failed: parsedResults.failed,
-          skipped: 0,
-          duration: null
-        });
-        
-        // Automatically switch to Test Results tab if there are test failures
-        if (parsedResults.failed > 0) {
-          setActiveOutputTab('tests');
-        }
-
-        // If tests passed (at least one passed and zero failed), unlock solution access
-        if (parsedResults.passed > 0 && parsedResults.failed === 0) {
-          setSolutionUnlocked(true);
-        }
-      } else {
-        setTestLines(['Tests were not run because the build failed.']);
-        setTestSummary({ total: 0, passed: 0, failed: 0, skipped: 0, duration: null });
-      }
-    } catch (error) {
-      setOutputLines([`Error: ${error.message || error}`]);
-      setTestLines(['Build and test execution failed.']);
-      setTestSummary({ total: 0, passed: 0, failed: 0, skipped: 0, duration: null });
-    }
-  }, [files, formatConsoleOutput, selectedAssessmentKey, workspaceMode, setActiveOutputTab, setOutputLines, setTestLines, setTestSummary]);
+  }, [setActiveOutputTab, setOutputLines, setTestLines, setTestSummary]);
 
   const handleSubmit = useCallback(async () => {
-    if (!selectedAssessmentKey) {
-      setActiveOutputTab('submission');
-      setSubmissionLines(['Select an assessment type to load code before submitting.']);
-      return;
-    }
-
     setActiveOutputTab('submission');
-    setSubmissionLines(['Submitting final solution...']);
+    setSubmissionLines(['Submission is unavailable in static mode. Please use the assessment download workflow instead.']);
+    setSubmitted(true);
+    setSolutionUnlocked(true);
+  }, [setActiveOutputTab, setSubmissionLines]);
 
-    try {
-      const response = await submitSolution(files, selectedAssessmentKey, workspaceMode);
-
-      // Prefer structured test summary returned by the backend
-      const testSummaryFromResponse = response?.testSummary || response?.test_summary || null;
-
-      if (testSummaryFromResponse) {
-        const passed = Number(testSummaryFromResponse.passed || testSummaryFromResponse.succeeded || testSummaryFromResponse.passing || 0);
-        const failed = Number(testSummaryFromResponse.failed || testSummaryFromResponse.failing || 0);
-
-        setSubmissionLines(createSubmissionLines(Boolean(response.success), { passed, failed, failures: testSummaryFromResponse.failures || [] }));
-        // Enable submission state and solution access even when tests failed
-        setSubmitted(true);
-        setSolutionUnlocked(true);
-        setTimerStarted(false);
-      } else {
-        // Fallback display when backend returns a flatter response
-        setSubmissionLines([
-          `Status: ${response.status || 'Submitted'}`,
-          `Passed: ${response.passed || 0}`,
-          `Failed: ${response.failed || 0}`,
-          `Message: ${response.message || 'Solution submitted.'}`
-        ]);
-
-        // Robustly detect a successful submission even if `success` flag is missing
-        const submissionSucceeded = Boolean(response.success)
-          || (response.status && /submitted|ok|success/i.test(String(response.status)))
-          || (response.message && /submitted|ok|success/i.test(String(response.message)))
-          || (((response.passed || 0) + (response.failed || 0)) > 0);
-
-        if (submissionSucceeded) {
-          setSubmitted(true);
-          setSolutionUnlocked(true);
-          setTimerStarted(false);
-        } else {
-          // Even when the backend marks the submission as blocked, consider the submission completed
-          // and enable solution retrieval per user request.
-          setSubmitted(true);
-          setSolutionUnlocked(true);
-          setTimerStarted(false);
-        }
-      }
-    } catch (error) {
-      setSubmissionLines([`Error: ${error.message || error}`]);
-    }
-  }, [files, selectedAssessmentKey, workspaceMode, setActiveOutputTab, setSubmissionLines]);
-
-  const handleGetSolution = useCallback(async () => {
-    if (!selectedAssessmentKey) {
-      setActiveOutputTab('submission');
-      setSubmissionLines(['Select an assessment type to load code before requesting a solution.']);
-      return;
-    }
-
-    if (!submitted && !solutionUnlocked) return;
-
+  const handleGetSolution = useCallback(() => {
     setActiveOutputTab('submission');
-    setSubmissionLines(['Loading solution workspace...']);
-
-    try {
-      await loadWorkspace({ assessmentKey: selectedAssessmentKey, mode: 'solution' });
-      setSubmissionLines(['Solution workspace loaded successfully.']);
-      setOutputLines(['Ready to build and run tests against the solution workspace.']);
-      setTestLines(['Test runner is ready.']);
-    } catch (error) {
-      setSubmissionLines([`Error: ${error.message || 'Unable to load solution workspace'}`]);
-    }
-  }, [loadWorkspace, selectedAssessmentKey, setActiveOutputTab, setSubmissionLines, solutionUnlocked, submitted, timeExpired]);
+    setSubmissionLines(['Solution download is available from the assessment page. Navigate there to get the solution ZIP.']);
+  }, [setActiveOutputTab, setSubmissionLines]);
 
   const handleAction = useCallback(async (action) => {
     if (action === 'hints') {
@@ -594,7 +484,7 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
               </div>
               <div className="min-h-[60vh] md:min-h-[70vh] lg:h-[calc(100vh-340px)] overflow-hidden rounded-3xl bg-slate-950">
                 {workspaceLoading ? (
-                  <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-300">Loading {activeAssessment?.label || 'assessment'} workspace from backend...</div>
+                  <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-300">Loading assessment workspace...</div>
                 ) : !selectedAssessmentKey ? (
                   <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-300">
                     <div className="max-w-lg space-y-3 rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-lg shadow-black/20">

@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { loadSolutionWorkspace, loadWorkspace } from '../services/api';
 import { fallbackWorkspaceFiles } from '../data/fallbackWorkspace';
 
 const initialFiles = [];
@@ -84,48 +83,25 @@ const useIDEStore = create((set, get) => ({
 
     set({ workspaceLoading: true, workspaceError: '' });
 
-    try {
-      const payload = mode === 'solution' ? await loadSolutionWorkspace(assessmentKey) : await loadWorkspace(assessmentKey, mode);
-      const files = (payload.files || []).map((file) => ({
-        ...file,
-        readOnly: file.readOnly ?? false
-      }));
-      const firstFileId = getDefaultFileId(files, get().activeFileId);
+    const files = fallbackWorkspaceFiles.map((file) => ({
+      ...file,
+      readOnly: file.readOnly ?? false
+    }));
+    const firstFileId = getDefaultFileId(files, get().activeFileId);
 
-      set({
-        files,
-        originalFiles: files,
-        activeFileId: firstFileId,
-        workspaceLoaded: true,
-        workspaceLoading: false,
-        workspaceMode: mode,
-        workspaceAssessmentKey: assessmentKey,
-        workspaceError: '',
-        unsavedChanges: false,
-        testSummary: { total: 0, passed: 0, failed: 0, skipped: 0, duration: null },
-        testCases: []
-      });
-    } catch (error) {
-      const fallbackFiles = fallbackWorkspaceFiles.map((file) => ({
-        ...file,
-        readOnly: file.readOnly ?? false
-      }));
-      const fallbackFileId = getDefaultFileId(fallbackFiles, get().activeFileId);
-
-      set({
-        files: fallbackFiles,
-        originalFiles: fallbackFiles,
-        activeFileId: fallbackFileId,
-        workspaceLoaded: true,
-        workspaceLoading: false,
-        workspaceMode: mode,
-        workspaceAssessmentKey: assessmentKey,
-        workspaceError: `Backend unavailable; loading fallback workspace. ${error?.message || ''}`,
-        unsavedChanges: false,
-        testSummary: { total: 0, passed: 0, failed: 0, skipped: 0, duration: null },
-        testCases: []
-      });
-    }
+    set({
+      files,
+      originalFiles: files,
+      activeFileId: firstFileId,
+      workspaceLoaded: true,
+      workspaceLoading: false,
+      workspaceMode: mode,
+      workspaceAssessmentKey: assessmentKey,
+      workspaceError: '',
+      unsavedChanges: false,
+      testSummary: { total: 0, passed: 0, failed: 0, skipped: 0, duration: null },
+      testCases: []
+    });
   },
   resetEditor: async () => {
     if (get().workspaceLoading) {
@@ -136,58 +112,30 @@ const useIDEStore = create((set, get) => ({
 
     set({ workspaceLoading: true, workspaceError: '' });
 
-    try {
-      const payload = await loadWorkspace(assessmentKey, 'starter');
-      const files = (payload.files || []).map((file) => ({
-        ...file,
-        readOnly: file.readOnly ?? false
-      }));
-      const firstFileId = getDefaultFileId(files);
+    const files = fallbackWorkspaceFiles.map((file) => ({
+      ...file,
+      readOnly: file.readOnly ?? false
+    }));
+    const firstFileId = getDefaultFileId(files);
 
-      set({
-        files,
-        originalFiles: files,
-        activeFileId: firstFileId,
-        workspaceLoaded: true,
-        workspaceLoading: false,
-        workspaceMode: 'starter',
-        workspaceAssessmentKey: assessmentKey,
-        unsavedChanges: false,
-        activeOutputTab: 'output',
-        activeRightTab: 'problem',
-        outputLines: ['Editor reset to live workspace files.'],
-        testLines: ['Test runner is ready.'],
-        submissionLines: [],
-        workspaceError: '',
-        testSummary: { total: 0, passed: 0, failed: 0, skipped: 0, duration: null },
-        testCases: []
-      });
-    } catch (error) {
-      const fallbackFiles = fallbackWorkspaceFiles.map((file) => ({
-        ...file,
-        readOnly: file.readOnly ?? false
-      }));
-      const fallbackFileId = getDefaultFileId(fallbackFiles);
-
-      set({
-        files: fallbackFiles,
-        originalFiles: fallbackFiles,
-        activeFileId: fallbackFileId,
-        workspaceLoaded: true,
-        workspaceLoading: false,
-        workspaceMode: 'starter',
-        workspaceAssessmentKey: assessmentKey,
-        workspaceError: `Reset failed; using fallback workspace. ${error?.message || ''}`,
-        unsavedChanges: false,
-        activeOutputTab: 'output',
-        activeRightTab: 'problem',
-        outputLines: ['Editor reset to live workspace files.'],
-        testLines: ['Test runner is ready.'],
-        submissionLines: [],
-        testSummary: { total: 0, passed: 0, failed: 0, skipped: 0, duration: null },
-        testCases: []
-      });
-    }
+    set({
+      files,
+      originalFiles: files,
+      activeFileId: firstFileId,
+      workspaceLoaded: true,
+      workspaceLoading: false,
+      workspaceMode: 'starter',
+      workspaceAssessmentKey: assessmentKey,
+      unsavedChanges: false,
+      activeOutputTab: 'output',
+      activeRightTab: 'problem',
+      outputLines: ['Editor reset to fallback workspace files.'],
+      testLines: ['Test runner is ready.'],
+      submissionLines: [],
+      workspaceError: '',
+      testSummary: { total: 0, passed: 0, failed: 0, skipped: 0, duration: null },
+      testCases: []
+    });
   },
   refreshFiles: async () => {
     await get().loadWorkspace({ assessmentKey: get().workspaceAssessmentKey || 'main-exam', mode: get().workspaceMode || 'starter' });
