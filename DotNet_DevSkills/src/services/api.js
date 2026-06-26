@@ -1,7 +1,10 @@
-const API_BASE = './api';
+const APP_BASE = new URL('./', window.location.href).href;
+const API_BASE = import.meta.env.VITE_API_BASE
+  ? new URL(import.meta.env.VITE_API_BASE, APP_BASE).href
+  : new URL('api/', APP_BASE).href;
 
 async function requestJson(path, payload) {
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(new URL(path, API_BASE).href, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -16,7 +19,7 @@ async function requestJson(path, payload) {
 }
 
 async function fetchJson(path) {
-  const response = await fetch(new URL(path, document.baseURI).href);
+  const response = await fetch(new URL(path, APP_BASE).href);
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(errorText || 'Failed to fetch JSON');
