@@ -34,7 +34,7 @@ namespace DataAccess.Validation
             if (!regex.IsMatch(sku))
                 return new ValidationResult("SKU must be in format A123");
 
-            return ValidationResult.Success!;
+            return ValidationResult.Success;
         }
     }
 }

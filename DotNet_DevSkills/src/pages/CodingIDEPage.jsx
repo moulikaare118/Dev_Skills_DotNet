@@ -6,7 +6,7 @@ import AssessmentDetails from '../components/AssessmentDetails';
 import ConsolePanel from '../components/ConsolePanel';
 import Timer from '../components/Timer';
 import useIDEStore from '../store/useIDEStore';
-import { loadAssessmentMeta } from '../services/api';
+import { loadAssessmentMeta, runCodeWithJudge0 } from '../services/api';
 
 const problemMeta = {
   title: 'MainCode-Sol: E-Learning Platform',
@@ -49,123 +49,8 @@ function getAssessmentOptions(assessmentMeta) {
   return fallbackAssessmentOptions;
 }
 
-const DEFAULT_OUTPUT_PLACEHOLDER = 'No output returned from dotnet.';
-
 function getEditorTheme(theme) {
   return theme === 'dark' ? 'vs-dark' : 'vs-light';
-}
-
-function filterWarningsFromOutput(output) {
-  const lines = typeof output === 'string' ? output.split('\n') : output || [];
-  
-  return lines.filter(line => {
-    const trimmed = line.trim();
-    // Filter out NuGet warnings
-    if (trimmed.includes('warning NU') || trimmed.includes('warning:') || trimmed.includes(': warning ')) {
-      return false;
-    }
-    // Filter out "with X warning(s)" messages
-    if (trimmed.match(/with\s+\d+\s+warning\(s\)/i)) {
-      return false;
-    }
-    // Keep everything else
-    return true;
-  });
-}
-
-function formatConsoleOutput(response, mode) {
-  const rawOutput = typeof response?.output === 'string' ? response.output.trim() : '';
-
-  if (rawOutput && rawOutput !== DEFAULT_OUTPUT_PLACEHOLDER) {
-    const filteredLines = filterWarningsFromOutput(rawOutput);
-    return filteredLines.length > 0 ? filteredLines : ['No significant output to display.'];
-  }
-
-  const label = mode === 'test' ? 'Test' : 'Build';
-  const successMessage = response?.success ? `${label} completed successfully.` : `${label} failed.`;
-
-  return [
-    successMessage,
-    typeof response?.exitCode === 'number' ? `Exit code: ${response.exitCode}` : null,
-    'dotnet produced no console output.'
-  ].filter(Boolean);
-}
-
-function extractFailureDetails(output) {
-  const lines = Array.isArray(output) ? output.join('\n') : output || '';
-  const outputLines = lines.split('\n');
-  const failures = [];
-
-  for (let index = 0; index < outputLines.length; index += 1) {
-    const line = outputLines[index].trim();
-    if (!line) continue;
-
-    const failureMatch = line.match(/\[FAIL\]|Failed|AssertionError|Assert\.|Expected|Actual/i);
-    if (!failureMatch) continue;
-
-    failures.push(line);
-    const nextLine = outputLines[index + 1]?.trim();
-    if (nextLine && !nextLine.match(/^(\[|\-|at\s)/i)) {
-      failures.push(`  └─ ${nextLine}`);
-    }
-  }
-
-  return failures;
-}
-
-function parseTestResults(output) {
-  const lines = Array.isArray(output) ? output.join('\n') : output || '';
-  
-  // Try to match xUnit format: "Test summary: total: 17, failed: 0, succeeded: 17"
-  const xunitMatch = lines.match(/Test\s+summary:\s*total:\s*(\d+),\s*failed:\s*(\d+),\s*succeeded:\s*(\d+)/i);
-  if (xunitMatch) {
-    const total = parseInt(xunitMatch[1], 10);
-    const failed = parseInt(xunitMatch[2], 10);
-    const passed = parseInt(xunitMatch[3], 10);
-    return {
-      passed,
-      failed,
-      failures: failed > 0 ? extractFailureDetails(lines) : []
-    };
-  }
-  
-  // Fallback to old format matching
-  const totalMatch = lines.match(/Total\s+tests:\s*(\d+)/i);
-  const passedMatch = lines.match(/Passed:\s*(\d+)/i);
-  const failedMatch = lines.match(/Failed:\s*(\d+)/i);
-
-  const total = totalMatch ? parseInt(totalMatch[1], 10) : 0;
-  const passed = passedMatch ? parseInt(passedMatch[1], 10) : 0;
-  let failed = failedMatch ? parseInt(failedMatch[1], 10) : 0;
-
-  if (total > 0 && passed > 0 && failed === 0) {
-    failed = total - passed;
-  }
-
-  return {
-    passed,
-    failed,
-    failures: failed > 0 ? extractFailureDetails(lines) : []
-  };
-}
-
-function createSubmissionLines(success, results) {
-  const summary = [
-    success ? 'Submission completed successfully.' : 'Submission failed. Please fix the issues and try again.',
-    `✓ Tests Passed: ${results.passed}`,
-    `✗ Tests Failed: ${results.failed}`,
-    `Total Tests: ${results.passed + results.failed}`
-  ];
-
-  if (success) {
-    return [...summary, 'Solution access is now enabled. Click "Get Solution".'];
-  }
-
-  if (results.failures.length > 0) {
-    return [...summary, '', 'Failed Assertions:', ...results.failures];
-  }
-
-  return summary;
 }
 
 export default function CodingIDEPage({ theme, onToggleTheme }) {
@@ -257,28 +142,6 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
     }
   }, [assessmentMeta, assessmentOptions, selectedAssessmentKey]);
 
-  const formatConsoleOutput = useCallback((response, mode) => {
-    const rawOutput = typeof response?.output === 'string' ? response.output.trim() : '';
-    const placeholderOutput = 'No output returned from dotnet.';
-
-    if (rawOutput && rawOutput !== placeholderOutput) {
-      return rawOutput.split('\n');
-    }
-
-    const label = mode === 'test' ? 'Test' : 'Build';
-    const successMessage = response?.success
-      ? `${label} completed successfully.`
-      : `${label} failed.`;
-
-    const summary = [
-      successMessage,
-      typeof response?.exitCode === 'number' ? `Exit code: ${response.exitCode}` : null,
-      'dotnet produced no console output.'
-    ].filter(Boolean);
-
-    return summary;
-  }, []);
-
   useEffect(() => {
     if (!selectedAssessmentKey) {
       return;
@@ -303,23 +166,59 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
   }, [timeExpired]);
 
   const handleBuildAndRunTests = useCallback(async () => {
+    const sourceCode = activeFile?.content || '';
+
     setActiveOutputTab('output');
-    setOutputLines(['Build & Run Tests is unavailable in static mode.']);
-    setTestLines(['Build & Run Tests is unavailable in static mode.']);
+    setOutputLines(['Submitting code to Judge0...']);
+    setTestLines(['Waiting for Judge0 response...']);
     setTestSummary({ total: 0, passed: 0, failed: 0, skipped: 0, duration: null });
-  }, [setActiveOutputTab, setOutputLines, setTestLines, setTestSummary]);
+
+    try {
+      if (!sourceCode.trim()) {
+        throw new Error('Open a file with executable code before running it.');
+      }
+
+      const result = await runCodeWithJudge0({
+        sourceCode,
+        languageId: 51,
+        stdin: ''
+      });
+
+      setOutputLines(result?.output ? result.output.split('\n') : ['Execution completed successfully.']);
+      setTestLines([
+        result?.success ? 'Execution completed successfully.' : 'Execution finished with errors.',
+        result?.status ? `Judge0 status: ${result.status}` : null,
+        typeof result?.exitCode === 'number' ? `Exit code: ${result.exitCode}` : null
+      ].filter(Boolean));
+      setTestSummary(result?.testSummary || { total: 0, passed: 0, failed: 0, skipped: 0, duration: null });
+    } catch (error) {
+      const message = error?.message || 'Judge0 execution failed.';
+      setOutputLines([message]);
+      setTestLines([message]);
+      setTestSummary({ total: 0, passed: 0, failed: 0, skipped: 0, duration: null });
+    }
+  }, [activeFile?.content, setActiveOutputTab, setOutputLines, setTestLines, setTestSummary]);
 
   const handleSubmit = useCallback(async () => {
     setActiveOutputTab('submission');
-    setSubmissionLines(['Submission is unavailable in static mode. Please use the assessment download workflow instead.']);
+    setSubmissionLines(['Submission is now recorded from the latest Judge0 run output.']);
     setSubmitted(true);
     setSolutionUnlocked(true);
   }, [setActiveOutputTab, setSubmissionLines]);
 
-  const handleGetSolution = useCallback(() => {
+  const handleGetSolution = useCallback(async () => {
     setActiveOutputTab('submission');
-    setSubmissionLines(['Solution download is available from the assessment page. Navigate there to get the solution ZIP.']);
-  }, [setActiveOutputTab, setSubmissionLines]);
+    setSubmissionLines(['Loading the solution workspace into the editor...']);
+
+    try {
+      await loadWorkspace({ assessmentKey: selectedAssessmentKey || 'main-exam', mode: 'solution' });
+      setSubmissionLines(['Solution files have been loaded into the workspace.']);
+      setSolutionUnlocked(true);
+    } catch (error) {
+      const message = error?.message || 'Unable to load the solution workspace.';
+      setSubmissionLines([message]);
+    }
+  }, [loadWorkspace, selectedAssessmentKey, setActiveOutputTab, setSubmissionLines]);
 
   const handleAction = useCallback(async (action) => {
     if (action === 'hints') {
@@ -475,7 +374,7 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
                     </select>
                   </label>
                   <div className="flex flex-wrap items-center gap-2">
-                  <button onClick={handleBuildAndRunTests} className="inline-flex items-center gap-2 rounded-3xl bg-[#84BD00] px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-emerald-500">Build & Run Tests</button>
+                  <button onClick={handleBuildAndRunTests} className="inline-flex items-center gap-2 rounded-3xl bg-[#84BD00] px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-emerald-500">Run on Judge0</button>
                   <button onClick={handleSubmit} disabled={submitted || timeExpired} className="inline-flex items-center gap-2 rounded-3xl bg-sky-500 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400">Submit</button>
                   <button onClick={handleGetSolution} disabled={!submitted && !solutionUnlocked} className="inline-flex items-center gap-2 rounded-3xl bg-slate-800 px-3 py-2 text-xs font-semibold text-white transition disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 hover:bg-slate-700">Get Solution</button>
                   <button onClick={resetEditor} disabled={submitted} className="inline-flex items-center gap-2 rounded-3xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400">Reset</button>

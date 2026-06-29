@@ -54,7 +54,7 @@
         "label": "HON Orders Code",
         "starterRoot": "public/testToday-main",
         "starterZip": "testToday-main.zip",
-        "solutionRoot": "public/testToday-main-Sol",
+        "solutionRoot": "public/testToday-main - Sol",
         "solutionZip": "testToday-main - Sol.zip",
         "solutionFile": "HONOrders.sln"
       }
@@ -82,7 +82,7 @@
       "HON.Orders solution with HON.Orders.Web, HON.Orders.Data, HON.Orders.Domain, and HON.Orders.Tests projects",
       "Responsive MVC layout with shared _Layout.cshtml and area-based routing",
       "EF Core fluent configuration, soft delete, query filters, and concurrency support",
-      "Admin area product CRUD and customer order creation UX with line items",
+      "Admin area product CRUD and Customer area order creation UX with line items",
       "Money value object and extension methods, LINQ analytics, async streams, and dynamic filter expression support"
     ],
     "tasks": [
@@ -92,7 +92,7 @@
       "Build IAsyncEnumerable order stream for paging and await foreach consumption",
       "Compose a dynamic Expression<Func<Order, bool>> filter for optional order query criteria",
       "Configure EF Core relationships, precision, shadow properties, and soft delete query filters",
-      "Implement Admin area Product CRUD and Customer area order creation form with validation",
+      "Implement Admin area Product CRUD and Customer order creation form with validation",
       "Use MVC tag helpers, TempData notifications, PRG, and authorization filter for Admin role"
     ]
   }

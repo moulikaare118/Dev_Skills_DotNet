@@ -1,16 +1,19 @@
 import { create } from 'zustand';
 import { fallbackWorkspaceFiles } from '../data/fallbackWorkspace';
+import { loadWorkspaceFiles } from '../services/workspaceLoader';
 
 const initialFiles = [];
 
-const getDefaultFileId = (files, currentId = null) => {
+const getDefaultFileId = (files, currentId = null, assessmentKey = 'main-exam') => {
   if (currentId && files.some((file) => file.id === currentId)) {
     return currentId;
   }
 
-  const defaultFile = files.find(
-    (file) => file.path.endsWith('CourseServices.cs') || file.name === 'CourseServices.cs'
-  );
+  const preferredFiles = assessmentKey === 'hon-orders'
+    ? ['ValidSkuAttribute.cs', 'OrderPredicateBuilder.cs', 'Money.cs', 'OrdersController.cs']
+    : ['CourseServices.cs', 'CourseController.cs', 'Program.cs'];
+
+  const defaultFile = files.find((file) => preferredFiles.some((name) => file.path?.endsWith(name) || file.name === name));
 
   return defaultFile?.id || files[0]?.id || null;
 };
@@ -83,11 +86,11 @@ const useIDEStore = create((set, get) => ({
 
     set({ workspaceLoading: true, workspaceError: '' });
 
-    const files = fallbackWorkspaceFiles.map((file) => ({
+    const files = (await loadWorkspaceFiles(assessmentKey, mode)).map((file) => ({
       ...file,
       readOnly: file.readOnly ?? false
     }));
-    const firstFileId = getDefaultFileId(files, get().activeFileId);
+    const firstFileId = getDefaultFileId(files, get().activeFileId, assessmentKey);
 
     set({
       files,
@@ -112,11 +115,11 @@ const useIDEStore = create((set, get) => ({
 
     set({ workspaceLoading: true, workspaceError: '' });
 
-    const files = fallbackWorkspaceFiles.map((file) => ({
+    const files = (await loadWorkspaceFiles(assessmentKey, 'starter')).map((file) => ({
       ...file,
       readOnly: file.readOnly ?? false
     }));
-    const firstFileId = getDefaultFileId(files);
+    const firstFileId = getDefaultFileId(files, null, assessmentKey);
 
     set({
       files,

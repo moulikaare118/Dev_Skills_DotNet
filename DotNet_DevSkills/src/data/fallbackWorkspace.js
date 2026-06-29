@@ -1,4 +1,4 @@
-export const fallbackWorkspaceFiles = [
+const mainExamWorkspaceFiles = [
   {
     id: 'model-student',
     name: 'Student.cs',
@@ -266,3 +266,62 @@ namespace HON.Academy.XunitTests
 }`
   }
 ];
+
+export const honOrdersWorkspaceFiles = [
+  {
+    id: 'order-predicate-builder',
+    name: 'OrderPredicateBuilder.cs',
+    path: 'DataAccess/Helper/OrderPredicateBuilder.cs',
+    readOnly: false,
+    content: ''
+  },
+  {
+    id: 'valid-sku-attribute',
+    name: 'ValidSkuAttribute.cs',
+    path: 'DataAccess/Validation/ValidSkuAttribute.cs',
+    readOnly: false,
+    content: ''
+  },
+  {
+    id: 'money-value-object',
+    name: 'Money.cs',
+    path: 'DataAccess/ValueObject/Money.cs',
+    readOnly: false,
+    content: ''
+  },
+  {
+    id: 'orders-controller',
+    name: 'OrdersController.cs',
+    path: 'HONOrdersApp/Controllers/OrdersController.cs',
+    readOnly: false,
+    content: ''
+  },
+  {
+    id: 'admin-controller',
+    name: 'AdminController.cs',
+    path: 'HONOrdersApp/Controllers/AdminController.cs',
+    readOnly: false,
+    content: ''
+  },
+  {
+    id: 'hon-orders-program',
+    name: 'Program.cs',
+    path: 'HONOrdersApp/Program.cs',
+    readOnly: false,
+    content: ''
+  },
+  {
+    id: 'money-tests',
+    name: 'MoneyAndValidationTests.cs',
+    path: 'HONOrders.Tests/MoneyAndValidationTests.cs',
+    readOnly: false,
+    content: ''
+  }
+];
+
+export const assessmentWorkspaceFiles = {
+  'main-exam': mainExamWorkspaceFiles,
+  'hon-orders': honOrdersWorkspaceFiles
+};
+
+export const fallbackWorkspaceFiles = mainExamWorkspaceFiles;

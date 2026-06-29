@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagement.DAL/DataAccess.csproj": {}
+    "/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagment.DAL/DataAccess.csproj": {}
   },
   "projects": {
-    "/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagement.DAL/DataAccess.csproj": {
+    "/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagment.DAL/DataAccess.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagement.DAL/DataAccess.csproj",
+        "projectUniqueName": "/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagment.DAL/DataAccess.csproj",
         "projectName": "DataAccess",
-        "projectPath": "/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagement.DAL/DataAccess.csproj",
+        "projectPath": "/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagment.DAL/DataAccess.csproj",
         "packagesPath": "/home/codespace/.nuget/packages/",
-        "outputPath": "/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagement.DAL/obj/",
+        "outputPath": "/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagment.DAL/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "/home/codespace/.nuget/NuGet/NuGet.Config"

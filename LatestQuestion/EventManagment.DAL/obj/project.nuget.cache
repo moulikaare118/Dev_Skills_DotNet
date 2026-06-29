@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "OU5N+6OdKes=",
+  "dgSpecHash": "8kbKdweHJ1o=",
   "success": true,
-  "projectFilePath": "/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagement.DAL/DataAccess.csproj",
+  "projectFilePath": "/workspaces/Dev_Skills_DotNet/LatestQuestion/EventManagment.DAL/DataAccess.csproj",
   "expectedPackageFiles": [
     "/home/codespace/.nuget/packages/azure.core/1.38.0/azure.core.1.38.0.nupkg.sha512",
     "/home/codespace/.nuget/packages/azure.identity/1.11.4/azure.identity.1.11.4.nupkg.sha512",

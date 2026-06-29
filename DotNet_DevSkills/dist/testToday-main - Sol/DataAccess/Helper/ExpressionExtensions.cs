@@ -22,8 +22,13 @@ namespace DataAccess.Helper
             var rightVisitor = new ReplaceExpressionVisitor(right.Parameters[0], parameter);
             var rightExpr = rightVisitor.Visit(right.Body);
 
+            if (leftExpr == null || rightExpr == null)
+            {
+                throw new InvalidOperationException("Unable to combine the supplied expressions.");
+            }
+
             return Expression.Lambda<Func<T, bool>>(
-                Expression.AndAlso(leftExpr!, rightExpr!), parameter);
+                Expression.AndAlso(leftExpr, rightExpr), parameter);
         }
         internal class ReplaceExpressionVisitor : ExpressionVisitor
         {

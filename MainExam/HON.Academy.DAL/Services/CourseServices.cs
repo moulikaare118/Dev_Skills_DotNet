@@ -26,7 +26,7 @@ namespace HON.Academy.DAL.Services
                 .Include(r => r.Assignment)
                     .ThenInclude(a => a.Course)
                 .Where(r => r.Student != null && r.Assignment != null && r.Assignment.Course != null)
-                .GroupBy(r => new { Name = r.Student!.Name, Title = r.Assignment!.Course!.Title })
+                .GroupBy(r => new { Name = r.Student == null ? string.Empty : r.Student.Name, Title = r.Assignment == null || r.Assignment.Course == null ? string.Empty : r.Assignment.Course.Title })
                 .Select(g => new StudentPerformanceDTO
                 {
                     StudentName = g.Key.Name,
