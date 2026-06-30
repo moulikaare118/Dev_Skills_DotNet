@@ -43,19 +43,19 @@
       {
         "key": "main-exam",
         "label": "Main Exam Code",
-        "starterRoot": "public/MainCode",
-        "starterZip": "MainCode.zip",
-        "solutionRoot": "public/MainCode-Sol",
-        "solutionZip": "MainCode-Sol.zip",
+        "starterRoot": "questions/main-exam/starter",
+        "starterZip": "questions/main-exam/starter.zip",
+        "solutionRoot": "questions/main-exam/solution",
+        "solutionZip": "questions/main-exam/solution.zip",
         "solutionFile": "HON.Academy.sln"
       },
       {
         "key": "hon-orders",
         "label": "HON Orders Code",
-        "starterRoot": "public/testToday-main",
-        "starterZip": "testToday-main.zip",
-        "solutionRoot": "public/testToday-main - Sol",
-        "solutionZip": "testToday-main - Sol.zip",
+        "starterRoot": "questions/hon-orders/starter",
+        "starterZip": "questions/hon-orders/starter.zip",
+        "solutionRoot": "questions/hon-orders/solution",
+        "solutionZip": "questions/hon-orders/solution.zip",
         "solutionFile": "HONOrders.sln"
       }
     ]

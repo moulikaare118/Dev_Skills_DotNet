@@ -6,7 +6,9 @@ import AssessmentDetails from '../components/AssessmentDetails';
 import ConsolePanel from '../components/ConsolePanel';
 import Timer from '../components/Timer';
 import useIDEStore from '../store/useIDEStore';
-import { loadAssessmentMeta, runCodeWithJudge0 } from '../services/api';
+import { loadAssessmentMeta } from '../services/api';
+import { submitAndWaitForResults, formatResultsForConsole, parseTestResults } from '../services/judge0Integration';
+import { createAndEncodeProjectZip } from '../services/zipGenerator';
 
 const problemMeta = {
   title: 'MainCode-Sol: E-Learning Platform',
@@ -137,8 +139,16 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
       return;
     }
 
-    if (selectedAssessmentKey && !assessmentOptions.some((assessment) => assessment.key === selectedAssessmentKey)) {
-      setSelectedAssessmentKey('');
+    if (!selectedAssessmentKey) {
+      const defaultKey = assessmentMeta?.codeEditor?.defaultAssessmentKey || assessmentOptions[0]?.key;
+      if (defaultKey) {
+        setSelectedAssessmentKey(defaultKey);
+      }
+      return;
+    }
+
+    if (!assessmentOptions.some((assessment) => assessment.key === selectedAssessmentKey)) {
+      setSelectedAssessmentKey(assessmentOptions[0]?.key || 'main-exam');
     }
   }, [assessmentMeta, assessmentOptions, selectedAssessmentKey]);
 
@@ -166,59 +176,108 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
   }, [timeExpired]);
 
   const handleBuildAndRunTests = useCallback(async () => {
-    const sourceCode = activeFile?.content || '';
-
     setActiveOutputTab('output');
-    setOutputLines(['Submitting code to Judge0...']);
-    setTestLines(['Waiting for Judge0 response...']);
+    setOutputLines(['Packing the current multi-file .NET project for browser-based execution...']);
+    setTestLines(['Submitting the workspace to Judge0 for build and test execution...']);
     setTestSummary({ total: 0, passed: 0, failed: 0, skipped: 0, duration: null });
 
     try {
-      if (!sourceCode.trim()) {
-        throw new Error('Open a file with executable code before running it.');
+      const projectFiles = files.map((file) => ({ path: file.path || file.name, content: file.content || '' }));
+      const packedProject = await createAndEncodeProjectZip(projectFiles, { includeScripts: true });
+
+      if (!packedProject.success) {
+        throw new Error(packedProject.error || 'Unable to package the current project.');
       }
 
-      const result = await runCodeWithJudge0({
-        sourceCode,
-        languageId: 51,
-        stdin: ''
-      });
+      const result = await submitAndWaitForResults(
+        {
+          additionalFiles: packedProject.base64,
+          compileCmd: 'bash compile.sh',
+          runCmd: 'bash run.sh'
+        },
+        { maxAttempts: 60, delayMs: 1000 }
+      );
 
-      setOutputLines(result?.output ? result.output.split('\n') : ['Execution completed successfully.']);
+      const formattedOutput = formatResultsForConsole(result);
+      const parsedSummary = parseTestResults(result.output || result.stdout || result.compileOutput || '');
+      const summary = {
+        total: parsedSummary.totalTests ?? 0,
+        passed: parsedSummary.passedTests ?? 0,
+        failed: parsedSummary.failedTests ?? 0,
+        skipped: parsedSummary.skippedTests ?? 0,
+        duration: null
+      };
+
+      setOutputLines(formattedOutput.length > 0 ? formattedOutput : ['No output returned from Judge0.']);
       setTestLines([
-        result?.success ? 'Execution completed successfully.' : 'Execution finished with errors.',
-        result?.status ? `Judge0 status: ${result.status}` : null,
-        typeof result?.exitCode === 'number' ? `Exit code: ${result.exitCode}` : null
+        result?.success ? 'Judge0 completed the build and test run.' : 'Judge0 reported a build or test issue.',
+        result?.status ? `Status: ${result.status}` : null,
+        typeof result?.exit_code === 'number' ? `Exit code: ${result.exit_code}` : null,
+        `Passed: ${summary.passed}`,
+        `Failed: ${summary.failed}`,
+        `Skipped: ${summary.skipped}`,
+        `Total: ${summary.total}`
       ].filter(Boolean));
-      setTestSummary(result?.testSummary || { total: 0, passed: 0, failed: 0, skipped: 0, duration: null });
+      setTestSummary(summary);
     } catch (error) {
-      const message = error?.message || 'Judge0 execution failed.';
+      const message = error?.message || 'The Judge0 execution flow is unavailable.';
       setOutputLines([message]);
       setTestLines([message]);
       setTestSummary({ total: 0, passed: 0, failed: 0, skipped: 0, duration: null });
     }
-  }, [activeFile?.content, setActiveOutputTab, setOutputLines, setTestLines, setTestSummary]);
+  }, [files, setActiveOutputTab, setOutputLines, setTestLines, setTestSummary]);
 
   const handleSubmit = useCallback(async () => {
     setActiveOutputTab('submission');
-    setSubmissionLines(['Submission is now recorded from the latest Judge0 run output.']);
-    setSubmitted(true);
-    setSolutionUnlocked(true);
-  }, [setActiveOutputTab, setSubmissionLines]);
+    setSubmissionLines(['Packing the current multi-file .NET project for submission evaluation...']);
+
+    try {
+      const projectFiles = files.map((file) => ({ path: file.path || file.name, content: file.content || '' }));
+      const packedProject = await createAndEncodeProjectZip(projectFiles, { includeScripts: true });
+
+      if (!packedProject.success) {
+        throw new Error(packedProject.error || 'Unable to package the current project for submission.');
+      }
+
+      const result = await submitAndWaitForResults(
+        {
+          additionalFiles: packedProject.base64,
+          compileCmd: 'bash compile.sh',
+          runCmd: 'bash run.sh'
+        },
+        { maxAttempts: 60, delayMs: 1000 }
+      );
+
+      const formattedOutput = formatResultsForConsole(result);
+      setSubmissionLines(formattedOutput.length > 0 ? formattedOutput : ['Submission completed.']);
+      setSubmitted(true);
+      setSolutionUnlocked(true);
+    } catch (error) {
+      const message = error?.message || 'Submission failed.';
+      setSubmissionLines([message]);
+      setSubmitted(true);
+      setSolutionUnlocked(true);
+    }
+  }, [files, setActiveOutputTab, setSubmissionLines]);
 
   const handleGetSolution = useCallback(async () => {
     setActiveOutputTab('submission');
     setSubmissionLines(['Loading the solution workspace into the editor...']);
 
     try {
-      await loadWorkspace({ assessmentKey: selectedAssessmentKey || 'main-exam', mode: 'solution' });
+      const assessmentKey = selectedAssessmentKey || assessmentOptions[0]?.key || 'main-exam';
+      await loadWorkspace({ assessmentKey, mode: 'solution' });
       setSubmissionLines(['Solution files have been loaded into the workspace.']);
       setSolutionUnlocked(true);
+
+      // After loading the solution workspace, automatically run the build/test
+      // so the solution gets compiled and any test output appears in the console.
+      await handleBuildAndRunTests();
     } catch (error) {
       const message = error?.message || 'Unable to load the solution workspace.';
       setSubmissionLines([message]);
     }
-  }, [loadWorkspace, selectedAssessmentKey, setActiveOutputTab, setSubmissionLines]);
+  }, [loadWorkspace, selectedAssessmentKey, assessmentOptions, setActiveOutputTab, setSubmissionLines, handleBuildAndRunTests]);
 
   const handleAction = useCallback(async (action) => {
     if (action === 'hints') {
@@ -362,7 +421,7 @@ export default function CodingIDEPage({ theme, onToggleTheme }) {
                     <select
                       value={selectedAssessmentKey}
                       onChange={(event) => setSelectedAssessmentKey(event.target.value)}
-                      disabled={!!selectedAssessmentKey && !submitted}
+                      disabled={workspaceLoading}
                       className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-sky-400 focus:bg-white disabled:cursor-not-allowed disabled:bg-slate-200"
                     >
                       <option value="">Select an assessment</option>
